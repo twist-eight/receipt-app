@@ -1,12 +1,24 @@
 // src/pages/upload.tsx
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import Image from "next/image";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles((prev) => [...prev, ...acceptedFiles]);
+
+    const newPreviews = acceptedFiles.map((file) => {
+      if (file.type.startsWith("image/")) {
+        return URL.createObjectURL(file); // ← 画像用のプレビューURLを生成
+      } else {
+        return ""; // PDFなどは空でOK
+      }
+    });
+
+    setPreviews((prev) => [...prev, ...newPreviews]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -38,10 +50,26 @@ export default function UploadPage() {
         )}
       </div>
 
-      <ul className="mt-6 space-y-2">
+      <ul className="mt-6 space-y-4">
         {files.map((file, i) => (
-          <li key={i} className="bg-gray-100 p-2 rounded shadow-sm">
-            {file.name}
+          <li
+            key={i}
+            className="bg-gray-100 p-3 rounded shadow-sm flex items-center gap-4"
+          >
+            {previews[i] ? (
+              <Image
+                src={previews[i]}
+                alt={file.name}
+                width={64}
+                height={64}
+                className="object-cover rounded"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-gray-300 flex items-center justify-center rounded text-sm text-gray-700">
+                PDF
+              </div>
+            )}
+            <span className="text-sm">{file.name}</span>
           </li>
         ))}
       </ul>
