@@ -1,233 +1,285 @@
-import { useState } from "react";
-import { PDFDocument } from "pdf-lib";
-import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
+import React, { useState, DragEvent, ChangeEvent } from "react";
+import Image from "next/image";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-type FileSet = {
+type FileItem = {
   id: string;
-  pdf?: File;
-  image?: File;
-  checked: boolean;
+  name: string;
+  type: string;
+  previewUrl?: string;
 };
 
-type Group = {
+type FileGroup = {
   id: string;
-  sets: FileSet[];
-  mergedPdf?: File;
-  previewImages: File[];
+  files: FileItem[];
+  continuous: boolean;
 };
 
-let setCounter = 1;
-let groupCounter = 1;
+const Upload: React.FC = () => {
+  // state for ungrouped files and grouped sets
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [groups, setGroups] = useState<FileGroup[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(
+    new Set()
+  );
 
-export default function UploadPage() {
-  const [fileSets, setFileSets] = useState<FileSet[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [multiPageUpload, setMultiPageUpload] = useState(false);
-
-  const mergePdfFiles = async (pdfFiles: File[]): Promise<File> => {
-    const mergedPdf = await PDFDocument.create();
-
-    for (const file of pdfFiles) {
-      const bytes = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(bytes);
-      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-      pages.forEach((page: unknown) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mergedPdf.addPage(page as any);
-      });
-    }
-
-    const mergedBytes = await mergedPdf.save();
-    return new File([mergedBytes], "merged.pdf", { type: "application/pdf" });
-  };
-
-  const convertPdfToImages = async (file: File): Promise<File[]> => {
-    const typedArray = new Uint8Array(await file.arrayBuffer());
-    const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
-    const result: File[] = [];
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
-
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d")!;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      await page.render({ canvasContext: context, viewport }).promise;
-
-      await new Promise<void>((resolve) => {
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const imageFile = new File([blob], `${file.name}_page${i}.jpg`, {
-              type: "image/jpeg",
-            });
-            result.push(imageFile);
-          }
-          resolve();
-        }, "image/jpeg");
-      });
-    }
-
-    return result;
-  };
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const newFileSets: FileSet[] = [];
-
-    if (multiPageUpload) {
-      // 連続ページとしてグループ化
-      const pdfFiles = files.filter((f) => f.type === "application/pdf");
-      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
-
-      const initialSet: FileSet = {
-        id: `set-${setCounter++}`,
-        pdf: pdfFiles[0],
-        image: imageFiles[0],
-        checked: false,
+  // handle file selection via input or drop
+  const handleFilesAdded = (fileList: FileList) => {
+    const newFiles: FileItem[] = [];
+    Array.from(fileList).forEach((file) => {
+      const id = `${Date.now()}-${file.name}`;
+      const fileItem: FileItem = {
+        id,
+        name: file.name,
+        type: file.type,
       };
-
-      mergePdfFiles(pdfFiles).then(async (merged) => {
-        const images = await convertPdfToImages(merged);
-        const group: Group = {
-          id: `group-${groupCounter++}`,
-          sets: [initialSet],
-          mergedPdf: merged,
-          previewImages: images,
-        };
-        setGroups((prev) => [...prev, group]);
-      });
-    } else {
-      // 個別ファイルを1セットずつ登録（PDFと画像でペア）
-      const pdfs = files.filter((f) => f.type === "application/pdf");
-      const images = files.filter((f) => f.type.startsWith("image/"));
-
-      const minLength = Math.min(pdfs.length, images.length);
-
-      for (let i = 0; i < minLength; i++) {
-        newFileSets.push({
-          id: `set-${setCounter++}`,
-          pdf: pdfs[i],
-          image: images[i],
-          checked: false,
-        });
+      // If image, create a preview URL
+      if (file.type.startsWith("image/")) {
+        fileItem.previewUrl = URL.createObjectURL(file);
       }
-
-      setFileSets((prev) => [...prev, ...newFileSets]);
-    }
-
-    e.target.value = "";
+      // For PDFs, we could set a generic icon or PDF preview if needed
+      newFiles.push(fileItem);
+    });
+    setFiles((prev) => [...prev, ...newFiles]);
   };
 
-  const toggleCheck = (id: string) => {
-    setFileSets((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, checked: !s.checked } : s))
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesAdded(e.dataTransfer.files);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const onDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const onFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFilesAdded(e.target.files);
+    }
+  };
+
+  // handle selection via checkbox
+  const toggleFileSelect = (fileId: string) => {
+    setSelectedFileIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  // group selected files
+  const groupSelectedFiles = () => {
+    if (selectedFileIds.size < 2) return; // need at least 2 to group
+    const newGroupFiles: FileItem[] = [];
+    const remainingFiles: FileItem[] = [];
+    files.forEach((file) => {
+      if (selectedFileIds.has(file.id)) {
+        newGroupFiles.push(file);
+      } else {
+        remainingFiles.push(file);
+      }
+    });
+    if (newGroupFiles.length > 0) {
+      const groupId = `group-${Date.now()}`;
+      const newGroup: FileGroup = {
+        id: groupId,
+        files: newGroupFiles,
+        continuous: true, // default to continuous pages
+      };
+      setGroups((prev) => [...prev, newGroup]);
+    }
+    // update remaining ungrouped files and clear selection
+    setFiles(remainingFiles);
+    setSelectedFileIds(new Set());
+  };
+
+  // remove a single file (ungrouped)
+  const removeFile = (fileId: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setSelectedFileIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(fileId);
+      return newSet;
+    });
+  };
+
+  // remove a whole group
+  const removeGroup = (groupId: string) => {
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+  };
+
+  // toggle continuous option for a group
+  const toggleContinuous = (groupId: string) => {
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId ? { ...g, continuous: !g.continuous } : g
+      )
     );
   };
 
-  const groupSelected = async () => {
-    const selectedSets = fileSets.filter((s) => s.checked);
-    if (selectedSets.length === 0) return;
-
-    const pdfFiles = selectedSets
-      .map((s) => s.pdf)
-      .filter((f): f is File => !!f);
-
-    const mergedPdf = await mergePdfFiles(pdfFiles);
-    const images = await convertPdfToImages(mergedPdf);
-
-    const group: Group = {
-      id: `group-${groupCounter++}`,
-      sets: selectedSets,
-      mergedPdf,
-      previewImages: images,
-    };
-
-    setGroups((prev) => [...prev, group]);
-    setFileSets((prev) => prev.filter((s) => !s.checked));
-  };
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">領収書アップロード</h1>
-
-      {/* オプション：連続ページとして扱う */}
-      <div className="mb-4 flex items-center gap-2">
+    <div className="max-w-2xl mx-auto p-4">
+      {/* Upload area */}
+      <div
+        className="mb-4 p-6 border-2 border-dashed border-gray-400 rounded-xl text-center text-gray-500 
+                   hover:border-blue-500 hover:text-blue-500 transition-colors cursor-pointer 
+                   bg-gradient-to-r from-gray-50 to-gray-100"
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onClick={() => document.getElementById("fileInput")?.click()}
+      >
+        <p className="text-lg">
+          ここにファイルをドラッグ＆ドロップ
+          <br />
+          またはクリックして選択
+        </p>
         <input
-          type="checkbox"
-          checked={multiPageUpload}
-          onChange={(e) => setMultiPageUpload(e.target.checked)}
+          id="fileInput"
+          type="file"
+          multiple
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={onFileInputChange}
         />
-        <label className="font-medium">
-          このアップロードを連続ページとして扱う
-        </label>
       </div>
 
-      {/* ファイルアップロード */}
-      <input
-        type="file"
-        multiple
-        accept=".pdf,image/*"
-        onChange={handleUpload}
-        className="mb-6"
-      />
-
-      {/* 仮セット一覧（グループ化されていないもの） */}
-      {fileSets.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-2">未グループのセット</h2>
+      {/* Group action button */}
+      {files.length > 0 && (
+        <div className="mb-4 text-right">
           <button
-            onClick={groupSelected}
-            className="mb-2 px-4 py-1 bg-blue-500 text-white rounded"
+            className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed 
+                       hover:bg-blue-700 transition"
+            onClick={groupSelectedFiles}
+            disabled={selectedFileIds.size < 2}
           >
-            ✅ チェックしたセットをグループ化
+            選択したファイルをグループ化
           </button>
-          <ul className="space-y-2">
-            {fileSets.map((set) => (
-              <li key={set.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={set.checked}
-                  onChange={() => toggleCheck(set.id)}
-                />
-                <span className="text-sm text-gray-800">
-                  {set.pdf?.name} + {set.image?.name}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 
-      {/* グループ一覧 */}
-      {groups.map((group) => (
-        <div key={group.id} className="mb-8 p-4 border rounded shadow">
-          <h3 className="font-semibold mb-2">📦 グループ: {group.id}</h3>
-          <ul className="list-disc pl-5 mb-3 text-sm">
-            {group.sets.map((s) => (
-              <li key={s.id}>
-                {s.pdf?.name} + {s.image?.name}
-              </li>
-            ))}
-          </ul>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {group.previewImages.map((img, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={URL.createObjectURL(img)}
-                alt={`preview-${i}`}
-                className="w-full h-auto border rounded"
-              />
-            ))}
-          </div>
+      {/* Ungrouped files list */}
+      {files.length > 0 && (
+        <div className="space-y-2 mb-6">
+          {files.map((file) => (
+            <div
+              key={file.id}
+              className="flex items-center justify-between p-3 bg-white/20 backdrop-blur-sm border border-gray-200 
+                         rounded-lg shadow-sm"
+            >
+              <div className="flex items-center min-w-0">
+                <input
+                  type="checkbox"
+                  className="mr-2 accent-blue-600"
+                  checked={selectedFileIds.has(file.id)}
+                  onChange={() => toggleFileSelect(file.id)}
+                />
+                {/* File icon or preview */}
+                {file.type.startsWith("image/") ? (
+                  <Image
+                    src={file.previewUrl!}
+                    alt={file.name}
+                    width={32}
+                    height={32}
+                    className="rounded mr-2 object-cover"
+                  />
+                ) : (
+                  <span
+                    className="w-8 h-8 mr-2 flex items-center justify-center 
+                                   bg-red-500 text-white text-xs font-bold rounded"
+                  >
+                    PDF
+                  </span>
+                )}
+                <span className="text-sm text-gray-800 truncate">
+                  {file.name}
+                </span>
+              </div>
+              <button
+                className="text-gray-500 hover:text-red-600 text-xl font-bold px-2"
+                onClick={() => removeFile(file.id)}
+                title="削除"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* Groups list */}
+      {groups.length > 0 && (
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <div
+              key={group.id}
+              className="p-4 bg-white/30 backdrop-blur-sm border border-gray-300 rounded-lg shadow"
+            >
+              {/* Group header */}
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-gray-700 font-semibold">
+                  グループ {group.id}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600 flex items-center">
+                    <input
+                      type="checkbox"
+                      className="mr-1 accent-blue-600"
+                      checked={group.continuous}
+                      onChange={() => toggleContinuous(group.id)}
+                    />
+                    連続ページ
+                  </label>
+                  <button
+                    className="text-gray-500 hover:text-red-600 text-xl font-bold"
+                    onClick={() => removeGroup(group.id)}
+                    title="グループを削除"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+              {/* Group file previews */}
+              <div className="flex flex-wrap gap-2">
+                {group.files.map((file, idx) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center text-sm text-gray-800 bg-gray-100 rounded px-2 py-1"
+                  >
+                    {file.type.startsWith("image/") ? (
+                      <Image
+                        src={file.previewUrl!}
+                        alt={file.name}
+                        width={24}
+                        height={24}
+                        className="rounded mr-1 object-cover"
+                      />
+                    ) : (
+                      <span
+                        className="w-6 h-6 mr-1 flex items-center justify-center 
+                                       bg-red-500 text-white text-xs font-bold rounded"
+                      >
+                        PDF
+                      </span>
+                    )}
+                    <span className="truncate max-w-[100px]">{file.name}</span>
+                    {idx < group.files.length - 1 && group.continuous && (
+                      <span className="mx-1 text-gray-400">→</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default Upload;
