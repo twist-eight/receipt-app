@@ -4,9 +4,8 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
 import Image from "next/image";
+import { jsPDF } from "jspdf";
 
 // PDF.js の worker 設定
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -19,47 +18,71 @@ type ReceiptSet = {
 export default function UploadPage() {
   const [receiptSets, setReceiptSets] = useState<ReceiptSet[]>([]);
 
+  // PDF → 画像変換
+  const convertPdfToImage = async (pdfFile: File): Promise<File> => {
+    const typedArray = new Uint8Array(await pdfFile.arrayBuffer());
+    const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 2 });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d")!;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    return new Promise<File>((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const imageFile = new File(
+            [blob],
+            pdfFile.name.replace(/\.pdf$/, ".jpg"),
+            { type: "image/jpeg" }
+          );
+          resolve(imageFile);
+        }
+      }, "image/jpeg");
+    });
+  };
+
+  // 画像 → PDF変換
+  const convertImageToPdf = async (imageFile: File): Promise<File> => {
+    return new Promise<File>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new window.Image();
+        img.onload = () => {
+          const pdf = new jsPDF({
+            orientation: img.width > img.height ? "landscape" : "portrait",
+            unit: "px",
+            format: [img.width, img.height],
+          });
+
+          pdf.addImage(img, "JPEG", 0, 0, img.width, img.height);
+          const pdfBlob = pdf.output("blob");
+          const pdfFile = new File(
+            [pdfBlob],
+            imageFile.name.replace(/\.[^.]+$/, ".pdf"),
+            { type: "application/pdf" }
+          );
+          resolve(pdfFile);
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(imageFile);
+    });
+  };
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
       if (file.type === "application/pdf") {
-        // PDF → 画像変換処理
-        const reader = new FileReader();
-
-        reader.onload = async () => {
-          const typedArray = new Uint8Array(reader.result as ArrayBuffer);
-          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
-          const page = await pdf.getPage(1);
-          const viewport = page.getViewport({ scale: 2 });
-
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d")!;
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-
-          await page.render({ canvasContext: context, viewport }).promise;
-
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const imageFile = new File(
-                [blob],
-                file.name.replace(/\.pdf$/, ".jpg"),
-                {
-                  type: "image/jpeg",
-                }
-              );
-
-              setReceiptSets((prev) => [
-                ...prev,
-                { pdf: file, image: imageFile },
-              ]);
-            }
-          }, "image/jpeg");
-        };
-
-        reader.readAsArrayBuffer(file);
+        const imageFile = await convertPdfToImage(file);
+        setReceiptSets((prev) => [...prev, { pdf: file, image: imageFile }]);
+      } else if (file.type.startsWith("image/")) {
+        const pdfFile = await convertImageToPdf(file);
+        setReceiptSets((prev) => [...prev, { pdf: pdfFile, image: file }]);
       }
-
-      // TODO: 画像 → PDF変換（次ステップで実装）
     }
   }, []);
 
