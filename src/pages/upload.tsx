@@ -1,30 +1,67 @@
 // src/pages/upload.tsx
+
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
 import Image from "next/image";
 
+// PDF.js の worker 設定
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+type ReceiptSet = {
+  pdf?: File;
+  image?: File;
+};
+
 export default function UploadPage() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [receiptSets, setReceiptSets] = useState<ReceiptSet[]>([]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles((prev) => [...prev, ...acceptedFiles]);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    for (const file of acceptedFiles) {
+      if (file.type === "application/pdf") {
+        // PDF → 画像変換処理
+        const reader = new FileReader();
 
-    const newPreviews = acceptedFiles.map((file) =>
-      file.type.startsWith("image/") ? URL.createObjectURL(file) : ""
-    );
+        reader.onload = async () => {
+          const typedArray = new Uint8Array(reader.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+          const page = await pdf.getPage(1);
+          const viewport = page.getViewport({ scale: 2 });
 
-    setPreviews((prev) => [...prev, ...newPreviews]);
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d")!;
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const imageFile = new File(
+                [blob],
+                file.name.replace(/\.pdf$/, ".jpg"),
+                {
+                  type: "image/jpeg",
+                }
+              );
+
+              setReceiptSets((prev) => [
+                ...prev,
+                { pdf: file, image: imageFile },
+              ]);
+            }
+          }, "image/jpeg");
+        };
+
+        reader.readAsArrayBuffer(file);
+      }
+
+      // TODO: 画像 → PDF変換（次ステップで実装）
+    }
   }, []);
-
-  const removeFile = (index: number) => {
-    const updatedFiles = [...files];
-    const updatedPreviews = [...previews];
-    updatedFiles.splice(index, 1);
-    updatedPreviews.splice(index, 1);
-    setFiles(updatedFiles);
-    setPreviews(updatedPreviews);
-  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -50,39 +87,27 @@ export default function UploadPage() {
           <p className="text-blue-500">ここにファイルをドロップしてください</p>
         ) : (
           <p className="text-gray-600">
-            クリックまたはファイルをドロップしてアップロード
+            クリックまたはドロップしてファイルをアップロード
           </p>
         )}
       </div>
 
       <ul className="mt-6 space-y-4">
-        {files.map((file, i) => (
-          <li
-            key={i}
-            className="bg-gray-100 p-3 rounded shadow-sm flex items-center justify-between gap-4"
-          >
-            <div className="flex items-center gap-4">
-              {previews[i] ? (
+        {receiptSets.map((set, i) => (
+          <li key={i} className="bg-gray-100 p-3 rounded shadow-sm">
+            <p className="text-sm font-bold">セット {i + 1}</p>
+            <div className="flex gap-4 items-center mt-2">
+              {set.image && (
                 <Image
-                  src={previews[i]}
-                  alt={file.name}
-                  width={64}
-                  height={64}
+                  src={URL.createObjectURL(set.image)}
+                  alt="preview"
+                  width={96}
+                  height={96}
                   className="object-cover rounded"
                 />
-              ) : (
-                <div className="w-16 h-16 bg-gray-300 flex items-center justify-center rounded text-sm text-gray-700">
-                  PDF
-                </div>
               )}
-              <span className="text-sm">{file.name}</span>
+              <span className="text-xs text-gray-700">{set.pdf?.name}</span>
             </div>
-            <button
-              onClick={() => removeFile(i)}
-              className="text-red-500 hover:text-red-700 text-sm font-semibold"
-            >
-              削除
-            </button>
           </li>
         ))}
       </ul>
