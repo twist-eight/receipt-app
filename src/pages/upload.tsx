@@ -10,16 +10,21 @@ export default function UploadPage() {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles((prev) => [...prev, ...acceptedFiles]);
 
-    const newPreviews = acceptedFiles.map((file) => {
-      if (file.type.startsWith("image/")) {
-        return URL.createObjectURL(file); // ← 画像用のプレビューURLを生成
-      } else {
-        return ""; // PDFなどは空でOK
-      }
-    });
+    const newPreviews = acceptedFiles.map((file) =>
+      file.type.startsWith("image/") ? URL.createObjectURL(file) : ""
+    );
 
     setPreviews((prev) => [...prev, ...newPreviews]);
   }, []);
+
+  const removeFile = (index: number) => {
+    const updatedFiles = [...files];
+    const updatedPreviews = [...previews];
+    updatedFiles.splice(index, 1);
+    updatedPreviews.splice(index, 1);
+    setFiles(updatedFiles);
+    setPreviews(updatedPreviews);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -54,22 +59,30 @@ export default function UploadPage() {
         {files.map((file, i) => (
           <li
             key={i}
-            className="bg-gray-100 p-3 rounded shadow-sm flex items-center gap-4"
+            className="bg-gray-100 p-3 rounded shadow-sm flex items-center justify-between gap-4"
           >
-            {previews[i] ? (
-              <Image
-                src={previews[i]}
-                alt={file.name}
-                width={64}
-                height={64}
-                className="object-cover rounded"
-              />
-            ) : (
-              <div className="w-16 h-16 bg-gray-300 flex items-center justify-center rounded text-sm text-gray-700">
-                PDF
-              </div>
-            )}
-            <span className="text-sm">{file.name}</span>
+            <div className="flex items-center gap-4">
+              {previews[i] ? (
+                <Image
+                  src={previews[i]}
+                  alt={file.name}
+                  width={64}
+                  height={64}
+                  className="object-cover rounded"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gray-300 flex items-center justify-center rounded text-sm text-gray-700">
+                  PDF
+                </div>
+              )}
+              <span className="text-sm">{file.name}</span>
+            </div>
+            <button
+              onClick={() => removeFile(i)}
+              className="text-red-500 hover:text-red-700 text-sm font-semibold"
+            >
+              削除
+            </button>
           </li>
         ))}
       </ul>
