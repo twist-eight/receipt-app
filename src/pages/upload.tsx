@@ -5,18 +5,16 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
 type FileSet = {
   id: string;
-  file: File;
-  type: "pdf" | "image";
+  pdf?: File;
+  image?: File;
   checked: boolean;
 };
 
 type Group = {
   id: string;
-  files: FileSet[];
+  sets: FileSet[];
   mergedPdf?: File;
   previewImages: File[];
 };
@@ -28,6 +26,23 @@ export default function UploadPage() {
   const [fileSets, setFileSets] = useState<FileSet[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [multiPageUpload, setMultiPageUpload] = useState(false);
+
+  const mergePdfFiles = async (pdfFiles: File[]): Promise<File> => {
+    const mergedPdf = await PDFDocument.create();
+
+    for (const file of pdfFiles) {
+      const bytes = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(bytes);
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach((page: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mergedPdf.addPage(page as any);
+      });
+    }
+
+    const mergedBytes = await mergedPdf.save();
+    return new File([mergedBytes], "merged.pdf", { type: "application/pdf" });
+  };
 
   const convertPdfToImages = async (file: File): Promise<File[]> => {
     const typedArray = new Uint8Array(await file.arrayBuffer());
@@ -48,11 +63,9 @@ export default function UploadPage() {
       await new Promise<void>((resolve) => {
         canvas.toBlob((blob) => {
           if (blob) {
-            const imageFile = new File(
-              [blob],
-              `${file.name.replace(/\.[^.]+$/, "")}_page${i}.jpg`,
-              { type: "image/jpeg" }
-            );
+            const imageFile = new File([blob], `${file.name}_page${i}.jpg`, {
+              type: "image/jpeg",
+            });
             result.push(imageFile);
           }
           resolve();
@@ -62,62 +75,54 @@ export default function UploadPage() {
 
     return result;
   };
-
-  const mergePdfFiles = async (files: File[]): Promise<File> => {
-    const mergedPdf = await PDFDocument.create();
-
-    for (const file of files) {
-      const bytes = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(bytes);
-      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-      copiedPages.forEach((page: unknown) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mergedPdf.addPage(page as any);
-      });
-    }
-
-    const mergedBytes = await mergedPdf.save();
-    return new File([mergedBytes], "merged.pdf", { type: "application/pdf" });
-  };
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const fileArray = Array.from(files);
+    const newFileSets: FileSet[] = [];
 
     if (multiPageUpload) {
-      // 一括グループとして追加
-      const newSets: FileSet[] = fileArray.map((f) => ({
+      // 連続ページとしてグループ化
+      const pdfFiles = files.filter((f) => f.type === "application/pdf");
+      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+
+      const initialSet: FileSet = {
         id: `set-${setCounter++}`,
-        file: f,
-        type: f.type.startsWith("image/") ? "image" : "pdf",
+        pdf: pdfFiles[0],
+        image: imageFiles[0],
         checked: false,
-      }));
+      };
 
-      const pdfs = newSets.filter((f) => f.type === "pdf").map((f) => f.file);
-
-      mergePdfFiles(pdfs).then(async (mergedPdf) => {
-        const images = await convertPdfToImages(mergedPdf);
-        const newGroup: Group = {
+      mergePdfFiles(pdfFiles).then(async (merged) => {
+        const images = await convertPdfToImages(merged);
+        const group: Group = {
           id: `group-${groupCounter++}`,
-          files: newSets,
-          mergedPdf,
+          sets: [initialSet],
+          mergedPdf: merged,
           previewImages: images,
         };
-        setGroups((prev) => [...prev, newGroup]);
+        setGroups((prev) => [...prev, group]);
       });
     } else {
-      // 単体で仮セットとして保持
-      const newSets: FileSet[] = fileArray.map((f) => ({
-        id: `set-${setCounter++}`,
-        file: f,
-        type: f.type.startsWith("image/") ? "image" : "pdf",
-        checked: false,
-      }));
-      setFileSets((prev) => [...prev, ...newSets]);
+      // 個別ファイルを1セットずつ登録（PDFと画像でペア）
+      const pdfs = files.filter((f) => f.type === "application/pdf");
+      const images = files.filter((f) => f.type.startsWith("image/"));
+
+      const minLength = Math.min(pdfs.length, images.length);
+
+      for (let i = 0; i < minLength; i++) {
+        newFileSets.push({
+          id: `set-${setCounter++}`,
+          pdf: pdfs[i],
+          image: images[i],
+          checked: false,
+        });
+      }
+
+      setFileSets((prev) => [...prev, ...newFileSets]);
     }
 
-    e.target.value = ""; // 同じファイル再選択時のためリセット
+    e.target.value = "";
   };
 
   const toggleCheck = (id: string) => {
@@ -127,41 +132,43 @@ export default function UploadPage() {
   };
 
   const groupSelected = async () => {
-    const selected = fileSets.filter((s) => s.checked);
-    if (selected.length === 0) return;
+    const selectedSets = fileSets.filter((s) => s.checked);
+    if (selectedSets.length === 0) return;
 
-    const pdfs = selected.filter((s) => s.type === "pdf").map((s) => s.file);
-    const mergedPdf = await mergePdfFiles(pdfs);
+    const pdfFiles = selectedSets
+      .map((s) => s.pdf)
+      .filter((f): f is File => !!f);
+
+    const mergedPdf = await mergePdfFiles(pdfFiles);
     const images = await convertPdfToImages(mergedPdf);
 
-    const newGroup: Group = {
+    const group: Group = {
       id: `group-${groupCounter++}`,
-      files: selected,
+      sets: selectedSets,
       mergedPdf,
       previewImages: images,
     };
 
-    setGroups((prev) => [...prev, newGroup]);
-    setFileSets((prev) => prev.filter((s) => !s.checked)); // グループ化したものを削除
+    setGroups((prev) => [...prev, group]);
+    setFileSets((prev) => prev.filter((s) => !s.checked));
   };
-
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">
-        領収書アップロード（セット＆グループ対応）
-      </h1>
+    <div className="p-6 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">領収書アップロード</h1>
 
-      <div className="mb-4">
-        <label className="mr-2 font-medium">
-          📎 このアップロードは連続ページとして扱う
-        </label>
+      {/* オプション：連続ページとして扱う */}
+      <div className="mb-4 flex items-center gap-2">
         <input
           type="checkbox"
           checked={multiPageUpload}
           onChange={(e) => setMultiPageUpload(e.target.checked)}
         />
+        <label className="font-medium">
+          このアップロードを連続ページとして扱う
+        </label>
       </div>
 
+      {/* ファイルアップロード */}
       <input
         type="file"
         multiple
@@ -170,18 +177,17 @@ export default function UploadPage() {
         className="mb-6"
       />
 
+      {/* 仮セット一覧（グループ化されていないもの） */}
       {fileSets.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">
-            仮セット一覧（未グループ）
-          </h2>
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-2">未グループのセット</h2>
           <button
-            className="mb-2 px-3 py-1 bg-blue-500 text-white rounded"
             onClick={groupSelected}
+            className="mb-2 px-4 py-1 bg-blue-500 text-white rounded"
           >
             ✅ チェックしたセットをグループ化
           </button>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {fileSets.map((set) => (
               <li key={set.id} className="flex items-center gap-2">
                 <input
@@ -189,8 +195,8 @@ export default function UploadPage() {
                   checked={set.checked}
                   onChange={() => toggleCheck(set.id)}
                 />
-                <span className="text-sm">
-                  {set.file.name} ({set.type})
+                <span className="text-sm text-gray-800">
+                  {set.pdf?.name} + {set.image?.name}
                 </span>
               </li>
             ))}
@@ -198,13 +204,14 @@ export default function UploadPage() {
         </div>
       )}
 
+      {/* グループ一覧 */}
       {groups.map((group) => (
-        <div key={group.id} className="mb-8 border p-4 rounded shadow">
-          <h2 className="font-semibold mb-2">📦 グループ: {group.id}</h2>
-          <ul className="list-disc pl-6 mb-2">
-            {group.files.map((f) => (
-              <li key={f.id} className="text-sm">
-                {f.file.name} ({f.type})
+        <div key={group.id} className="mb-8 p-4 border rounded shadow">
+          <h3 className="font-semibold mb-2">📦 グループ: {group.id}</h3>
+          <ul className="list-disc pl-5 mb-3 text-sm">
+            {group.sets.map((s) => (
+              <li key={s.id}>
+                {s.pdf?.name} + {s.image?.name}
               </li>
             ))}
           </ul>
