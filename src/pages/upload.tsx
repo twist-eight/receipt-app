@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
+import { ReceiptItem } from "@/types/receipt";
+import { v4 as uuidv4 } from "uuid";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [mergeMode, setMergeMode] = useState(false); // まとめるかどうか
   const router = useRouter();
 
   const handleFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,13 +40,11 @@ export default function UploadPage() {
     return canvas.toDataURL("image/jpeg");
   };
 
-  const splitPdfPages = async (
-    file: File
-  ): Promise<{ imageUrl: string; pdfUrl: string }[]> => {
-    const results = [];
+  const splitPdfPages = async (file: File): Promise<ReceiptItem[]> => {
     const data = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(data);
     const totalPages = pdfDoc.getPageCount();
+    const results: ReceiptItem[] = [];
 
     for (let i = 0; i < totalPages; i++) {
       const newPdf = await PDFDocument.create();
@@ -58,7 +57,21 @@ export default function UploadPage() {
         new Uint8Array(await pdfBlob.arrayBuffer()),
         0
       );
-      results.push({ pdfUrl, imageUrl });
+      const groupId = uuidv4();
+
+      results.push({
+        id: `page-${i}`,
+        imageUrl,
+        pdfUrl,
+        date: "2025-04-01",
+        vendor: "仮の商店",
+        amount: 1000,
+        type: "領収書",
+        memo: "PDF分割",
+        tag: "交際費",
+        status: "完了",
+        groupId,
+      });
     }
 
     return results;
@@ -66,70 +79,19 @@ export default function UploadPage() {
 
   const handleUpload = async () => {
     setIsLoading(true);
+    const allResults: ReceiptItem[] = [];
 
-    interface ReceiptItem {
-      id: string;
-      imageUrl: string;
-      pdfUrl: string;
-      date: string;
-      vendor: string;
-      amount: number;
-      type: string;
-      memo: string;
-      tag: string;
-      status: string;
-    }
-
-    const results: ReceiptItem[] = [];
-
-    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
-      const file = files[fileIndex];
+    for (const file of files) {
       if (file.type === "application/pdf") {
-        if (mergeMode) {
-          const pdfUrl = URL.createObjectURL(file);
-          const imageUrl = await pdfPageToImage(
-            new Uint8Array(await file.arrayBuffer()),
-            0
-          );
-          results.push({
-            id: `upload-${fileIndex}`,
-            imageUrl,
-            pdfUrl,
-            date: "2025-04-01",
-            vendor: "仮の商店",
-            amount: 1000,
-            type: "領収書",
-            memo: "アップロードテスト",
-            tag: "交際費",
-            status: "完了",
-          });
-        } else {
-          const pages = await splitPdfPages(file);
-          pages.forEach((page, i) => {
-            results.push({
-              id: `upload-${fileIndex}-${i}`,
-              imageUrl: page.imageUrl,
-              pdfUrl: page.pdfUrl,
-              date: "2025-04-01",
-              vendor: "仮の商店",
-              amount: 1000,
-              type: "領収書",
-              memo: "ページ分割",
-              tag: "交際費",
-              status: "完了",
-            });
-          });
-        }
+        const splitResults = await splitPdfPages(file);
+        allResults.push(...splitResults);
       } else if (file.type.startsWith("image/")) {
         const imageUrl = URL.createObjectURL(file);
         const pdfDoc = await PDFDocument.create();
         const imageBytes = await file.arrayBuffer();
-        const ext = file.type.split("/")[1];
-        const embedded =
-          ext === "png"
-            ? await pdfDoc.embedPng(imageBytes)
-            : await pdfDoc.embedJpg(imageBytes);
-
+        const embedded = await (file.type.includes("png")
+          ? pdfDoc.embedPng(imageBytes)
+          : pdfDoc.embedJpg(imageBytes));
         const page = pdfDoc.addPage();
         page.drawImage(embedded, {
           x: 0,
@@ -137,34 +99,34 @@ export default function UploadPage() {
           width: page.getWidth(),
           height: page.getHeight(),
         });
-
         const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
-        const pdfUrl = URL.createObjectURL(blob);
+        const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const groupId = uuidv4();
 
-        results.push({
-          id: `upload-${fileIndex}`,
+        allResults.push({
+          id: `img-${Date.now()}`,
           imageUrl,
           pdfUrl,
           date: "2025-04-01",
           vendor: "仮の商店",
           amount: 1000,
           type: "領収書",
-          memo: "アップロードテスト",
+          memo: "画像処理",
           tag: "交際費",
           status: "完了",
+          groupId,
         });
       }
     }
 
-    sessionStorage.setItem("ocrResults", JSON.stringify(results));
+    sessionStorage.setItem("ocrResults", JSON.stringify(allResults));
     router.push("/review");
   };
 
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">領収書アップロード</h1>
-
       <input
         type="file"
         multiple
@@ -172,17 +134,6 @@ export default function UploadPage() {
         onChange={handleFilesChange}
         className="mb-4"
       />
-
-      <label className="flex items-center mb-4">
-        <input
-          type="checkbox"
-          className="mr-2"
-          checked={mergeMode}
-          onChange={(e) => setMergeMode(e.target.checked)}
-        />
-        複数ページPDFを1件として保存（明細書など）
-      </label>
-
       <div className="grid grid-cols-2 gap-4 mb-6">
         {files.map((file, index) => (
           <div key={index} className="border p-2 rounded shadow-sm relative">
@@ -196,7 +147,6 @@ export default function UploadPage() {
           </div>
         ))}
       </div>
-
       <button
         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         onClick={handleUpload}
