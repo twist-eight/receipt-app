@@ -18,7 +18,7 @@ export default function ReviewPage() {
   const [items, setItems] = useState<ReceiptItem[]>([]);
 
   useEffect(() => {
-    const raw = localStorage.getItem("ocrResults");
+    const raw = sessionStorage.getItem("ocrResults");
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -43,16 +43,21 @@ export default function ReviewPage() {
     });
   };
 
-  const handleOpenPdf = (base64Pdf: string) => {
-    if (!base64Pdf.startsWith("data:application/pdf")) return;
-    const byteCharacters = atob(base64Pdf.split(",")[1]);
-    const byteNumbers = new Array(byteCharacters.length)
-      .fill(0)
-      .map((_, i) => byteCharacters.charCodeAt(i));
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: "application/pdf" });
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, "_blank");
+  const handleOpenPdf = (pdfUrl: string) => {
+    if (pdfUrl.startsWith("blob:") || pdfUrl.startsWith("http")) {
+      window.open(pdfUrl, "_blank");
+    } else if (pdfUrl.startsWith("data:application/pdf")) {
+      const byteCharacters = atob(pdfUrl.split(",")[1]);
+      const byteNumbers = new Array(byteCharacters.length)
+        .fill(0)
+        .map((_, i) => byteCharacters.charCodeAt(i));
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+    } else {
+      console.warn("無効なPDF URLです", pdfUrl);
+    }
   };
 
   const loadTestData = () => {
@@ -70,7 +75,7 @@ export default function ReviewPage() {
         status: "完了",
       },
     ];
-    localStorage.setItem("ocrResults", JSON.stringify(testData));
+    sessionStorage.setItem("ocrResults", JSON.stringify(testData));
     setItems(testData);
   };
 
