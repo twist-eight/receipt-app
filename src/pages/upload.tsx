@@ -8,6 +8,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [mergeMode, setMergeMode] = useState(false); // まとめるかどうか
   const router = useRouter();
 
   const handleFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,10 +22,12 @@ export default function UploadPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const pdfToImage = async (file: File): Promise<string> => {
-    const pdfData = new Uint8Array(await file.arrayBuffer());
+  const pdfPageToImage = async (
+    pdfData: Uint8Array,
+    pageIndex: number
+  ): Promise<string> => {
     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-    const page = await pdf.getPage(1);
+    const page = await pdf.getPage(pageIndex + 1);
     const viewport = page.getViewport({ scale: 1.5 });
 
     const canvas = document.createElement("canvas");
@@ -36,78 +39,111 @@ export default function UploadPage() {
     return canvas.toDataURL("image/jpeg");
   };
 
-  const convertPngToJpegBlob = async (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const reader = new FileReader();
-      reader.onload = () => {
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          ctx!.drawImage(img, 0, 0);
-          canvas.toBlob(
-            (blob) => {
-              if (blob) resolve(blob);
-            },
-            "image/jpeg",
-            0.95
-          );
-        };
-        img.src = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
+  const splitPdfPages = async (
+    file: File
+  ): Promise<{ imageUrl: string; pdfUrl: string }[]> => {
+    const results = [];
+    const data = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(data);
+    const totalPages = pdfDoc.getPageCount();
+
+    for (let i = 0; i < totalPages; i++) {
+      const newPdf = await PDFDocument.create();
+      const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
+      newPdf.addPage(copiedPage);
+      const pdfBytes = await newPdf.save();
+      const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const imageUrl = await pdfPageToImage(
+        new Uint8Array(await pdfBlob.arrayBuffer()),
+        0
+      );
+      results.push({ pdfUrl, imageUrl });
+    }
+
+    return results;
   };
 
   const handleUpload = async () => {
     setIsLoading(true);
 
-    const results = await Promise.all(
-      files.map(async (file, i) => {
-        let imageUrl = "";
-        let pdfUrl = "";
+    interface ReceiptItem {
+      id: string;
+      imageUrl: string;
+      pdfUrl: string;
+      date: string;
+      vendor: string;
+      amount: number;
+      type: string;
+      memo: string;
+      tag: string;
+      status: string;
+    }
 
-        if (file.type === "application/pdf") {
-          pdfUrl = URL.createObjectURL(file);
-          imageUrl = await pdfToImage(file);
-        } else if (file.type === "image/png") {
-          const jpegBlob = await convertPngToJpegBlob(file);
-          imageUrl = URL.createObjectURL(jpegBlob);
+    const results: ReceiptItem[] = [];
 
-          const pdfDoc = await PDFDocument.create();
-          const jpgImage = await pdfDoc.embedJpg(await jpegBlob.arrayBuffer());
-          const page = pdfDoc.addPage();
-          page.drawImage(jpgImage, {
-            x: 0,
-            y: 0,
-            width: page.getWidth(),
-            height: page.getHeight(),
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const file = files[fileIndex];
+      if (file.type === "application/pdf") {
+        if (mergeMode) {
+          const pdfUrl = URL.createObjectURL(file);
+          const imageUrl = await pdfPageToImage(
+            new Uint8Array(await file.arrayBuffer()),
+            0
+          );
+          results.push({
+            id: `upload-${fileIndex}`,
+            imageUrl,
+            pdfUrl,
+            date: "2025-04-01",
+            vendor: "仮の商店",
+            amount: 1000,
+            type: "領収書",
+            memo: "アップロードテスト",
+            tag: "交際費",
+            status: "完了",
           });
-          const pdfBytes = await pdfDoc.save();
-          const blob = new Blob([pdfBytes], { type: "application/pdf" });
-          pdfUrl = URL.createObjectURL(blob);
-        } else if (file.type.startsWith("image/")) {
-          imageUrl = URL.createObjectURL(file);
-
-          const pdfDoc = await PDFDocument.create();
-          const imageBytes = await file.arrayBuffer();
-          const embedded = await pdfDoc.embedJpg(imageBytes);
-          const page = pdfDoc.addPage();
-          page.drawImage(embedded, {
-            x: 0,
-            y: 0,
-            width: page.getWidth(),
-            height: page.getHeight(),
+        } else {
+          const pages = await splitPdfPages(file);
+          pages.forEach((page, i) => {
+            results.push({
+              id: `upload-${fileIndex}-${i}`,
+              imageUrl: page.imageUrl,
+              pdfUrl: page.pdfUrl,
+              date: "2025-04-01",
+              vendor: "仮の商店",
+              amount: 1000,
+              type: "領収書",
+              memo: "ページ分割",
+              tag: "交際費",
+              status: "完了",
+            });
           });
-          const pdfBytes = await pdfDoc.save();
-          const blob = new Blob([pdfBytes], { type: "application/pdf" });
-          pdfUrl = URL.createObjectURL(blob);
         }
+      } else if (file.type.startsWith("image/")) {
+        const imageUrl = URL.createObjectURL(file);
+        const pdfDoc = await PDFDocument.create();
+        const imageBytes = await file.arrayBuffer();
+        const ext = file.type.split("/")[1];
+        const embedded =
+          ext === "png"
+            ? await pdfDoc.embedPng(imageBytes)
+            : await pdfDoc.embedJpg(imageBytes);
 
-        return {
-          id: `upload-${i}`,
+        const page = pdfDoc.addPage();
+        page.drawImage(embedded, {
+          x: 0,
+          y: 0,
+          width: page.getWidth(),
+          height: page.getHeight(),
+        });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const pdfUrl = URL.createObjectURL(blob);
+
+        results.push({
+          id: `upload-${fileIndex}`,
           imageUrl,
           pdfUrl,
           date: "2025-04-01",
@@ -117,9 +153,9 @@ export default function UploadPage() {
           memo: "アップロードテスト",
           tag: "交際費",
           status: "完了",
-        };
-      })
-    );
+        });
+      }
+    }
 
     sessionStorage.setItem("ocrResults", JSON.stringify(results));
     router.push("/review");
@@ -136,6 +172,16 @@ export default function UploadPage() {
         onChange={handleFilesChange}
         className="mb-4"
       />
+
+      <label className="flex items-center mb-4">
+        <input
+          type="checkbox"
+          className="mr-2"
+          checked={mergeMode}
+          onChange={(e) => setMergeMode(e.target.checked)}
+        />
+        複数ページPDFを1件として保存（明細書など）
+      </label>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         {files.map((file, index) => (
