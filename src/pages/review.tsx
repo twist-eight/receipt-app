@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
 import Image from "next/image";
 
 interface ReceiptItem {
@@ -17,17 +16,20 @@ interface ReceiptItem {
 
 export default function ReviewPage() {
   const [items, setItems] = useState<ReceiptItem[]>([]);
-  const router = useRouter();
 
   useEffect(() => {
     const raw = localStorage.getItem("ocrResults");
     if (raw) {
-      const parsed = JSON.parse(raw);
-      setItems(parsed);
-    } else {
-      router.push("/upload");
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setItems(parsed);
+        }
+      } catch (e) {
+        console.error("JSON parse error:", e);
+      }
     }
-  }, [router]);
+  }, []);
 
   const handleChange = (
     index: number,
@@ -39,6 +41,18 @@ export default function ReviewPage() {
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
+  };
+
+  const handleOpenPdf = (base64Pdf: string) => {
+    if (!base64Pdf.startsWith("data:application/pdf")) return;
+    const byteCharacters = atob(base64Pdf.split(",")[1]);
+    const byteNumbers = new Array(byteCharacters.length)
+      .fill(0)
+      .map((_, i) => byteCharacters.charCodeAt(i));
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "application/pdf" });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank");
   };
 
   const loadTestData = () => {
@@ -82,22 +96,24 @@ export default function ReviewPage() {
         {items.map((item, i) => (
           <div key={item.id} className="border p-4 rounded shadow-md">
             <div className="flex gap-4 mb-2 items-center">
-              <div className="relative w-32 h-40">
-                <Image
-                  src={item.imageUrl}
-                  alt="preview"
-                  fill
-                  className="object-contain rounded"
-                />
-              </div>
-              <a
-                href={item.pdfUrl}
-                target="_blank"
-                rel="noopener"
-                className="text-blue-600 underline text-sm"
-              >
-                PDFを開く
-              </a>
+              {item.imageUrl && (
+                <div className="relative w-32 h-40">
+                  <Image
+                    src={item.imageUrl}
+                    alt="preview"
+                    fill
+                    className="object-contain rounded"
+                  />
+                </div>
+              )}
+              {item.pdfUrl && (
+                <button
+                  onClick={() => handleOpenPdf(item.pdfUrl)}
+                  className="text-blue-600 underline text-sm"
+                >
+                  PDFを開く
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <input
