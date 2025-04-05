@@ -653,6 +653,237 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-pdf-viewer/attachment@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/attachment@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/21a7989e5816f07a03463789809e241c9963e35e829409d998e5e06ae0558e5bc8ed5791d49d8e5e5c615062afb438413071c8f8989df101d796b51315e8e809
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/bookmark@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/bookmark@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/ecceec5cdace8f452a372ed8062547a761045187a6006b545ec3f01b157acd8c48f841cda7682fdd0e0e7ffb88b31052c4c9693ce748458746f8e353785c7009
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/core@npm:3.12.0, @react-pdf-viewer/core@npm:^3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/core@npm:3.12.0"
+  peerDependencies:
+    pdfjs-dist: ^2.16.105 || ^3.0.279
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/40c28687c11f2b929ea591806e23066103854ff8427f5af592e2aaedd08a9d401144fa4f9fb8c0c4a82c08d4ace6de16dda0192d8050442e75abb10c9c4a5973
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/default-layout@npm:^3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/default-layout@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/attachment": "npm:3.12.0"
+    "@react-pdf-viewer/bookmark": "npm:3.12.0"
+    "@react-pdf-viewer/core": "npm:3.12.0"
+    "@react-pdf-viewer/thumbnail": "npm:3.12.0"
+    "@react-pdf-viewer/toolbar": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/a34a9f2efc94d1f7d1f519c61fe62eab2a8d05f2a99cf8057ded8a05102659c6cdfc0f1fedb5cb836962f0fa5aa062ef569e8d8766a2a07ed84ad9c2cd33a091
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/full-screen@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/full-screen@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/5a712680c4ff91dcf890792b9d3eac1da916b6b1454dd56e793cd4ab292b066b5ceb435d2f38f573ec76f4b30ea089ec02e3120530d1e54adfef971920ad518a
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/get-file@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/get-file@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/63eb02c1bb91729846c6934f8dcd20bdcf01ebf4605fc6b19ffed096b9a6d074f98e222400838cf8c52ee493485198683b269ea94dbfe25f9fff08e953c24858
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/open@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/open@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/a0b8923ad2cffa058f524f4b0161a1799aa4f41a327b6d89c7b78ee15120b7f7eb43a008c367756252e1e435ff79c5c8be1e393f60ee554d89b94c294ac8a51b
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/page-navigation@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/page-navigation@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/ed2ad58e0f697e632cda845bdddecd55d72d4197450a3372374053f5f4915c95b927eaf77da3fd288003bdf4a6383d1d2881b18477bfbddbdd1c766d281df0d4
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/print@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/print@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/993d2f59a0a960f8c9b8c6018b2490ea104e5ab9023f9618dbd5d0de107d465b56313e44142641a02aad82f9ac8535d6db40d1bdc4272f3e3fb73a73558e9c63
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/properties@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/properties@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/06ea3f1ae044b508587aa5108eb0128b75d8889a0245621d6a69fbbd1128fbe37550c5c6796337c4521333deea22dbe60007df986d7ece9ce5602947c6ce9329
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/rotate@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/rotate@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/69e34da618407e86d4bd2ec83ba9828334d3c9449ed13c1b62c99fddac6d784f35dc671f9f1e3374c5f5fcf45146b959753e20937b89e62f0f551fba09f5e213
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/scroll-mode@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/scroll-mode@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/fa8d3c167791887b0d6f224ee2a23cd815b520dd432e371e15cfd1a4af30fb4899c99418500996b307ccfafd4d93520dd4b3e2cf3868abd8d4091a2d8c57b993
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/search@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/search@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/44da6915df8e6c19c9384699afc92db81bb4d81a795520b5b09dd4bea606d82c0255416d90fa7f1d953d02b430f76b10c0c663dca43e04c2a829ec24e01356fc
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/selection-mode@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/selection-mode@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/f15281b89001733564383c0f43633387cccb938e388e827c4d4b557b2d3e8f39f9cb158249759c2595ccf27cf9500662f1d4b1c9d98d84518627bf64b92032ab
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/theme@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/theme@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/4fcf29c78bced82dccf4d18afd2bd2c77fb224f9f2bea8dfec64dbf953335d58dd85c4760c097fc8f8e9a739fd805fbe681224458ab4c4428400a150b5fb4734
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/thumbnail@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/thumbnail@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/fb5842fa4e6d5087ae6554813a583e6961b2676b2300ca565a4b6ab1c525f222d59f8d8e04f08d4c22642cf1649e0dbf8c8caf5a128fdb4c72b9968f9b0c30b0
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/toolbar@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/toolbar@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+    "@react-pdf-viewer/full-screen": "npm:3.12.0"
+    "@react-pdf-viewer/get-file": "npm:3.12.0"
+    "@react-pdf-viewer/open": "npm:3.12.0"
+    "@react-pdf-viewer/page-navigation": "npm:3.12.0"
+    "@react-pdf-viewer/print": "npm:3.12.0"
+    "@react-pdf-viewer/properties": "npm:3.12.0"
+    "@react-pdf-viewer/rotate": "npm:3.12.0"
+    "@react-pdf-viewer/scroll-mode": "npm:3.12.0"
+    "@react-pdf-viewer/search": "npm:3.12.0"
+    "@react-pdf-viewer/selection-mode": "npm:3.12.0"
+    "@react-pdf-viewer/theme": "npm:3.12.0"
+    "@react-pdf-viewer/zoom": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/183158736c793ed600fc24f02bc6a2184a8d629fb96e3ae33c947923acfbbd33920423dc4ecbbcf846b7edc8b56b894fe548f50dcbe85cbb93cdbbae4d403411
+  languageName: node
+  linkType: hard
+
+"@react-pdf-viewer/zoom@npm:3.12.0":
+  version: 3.12.0
+  resolution: "@react-pdf-viewer/zoom@npm:3.12.0"
+  dependencies:
+    "@react-pdf-viewer/core": "npm:3.12.0"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/8d17710da92b0acc24beb55ebdec9ff70d173004ab483dcfd34e508a36ccff21bdcd8e9c2f353f9c30eebc54b46e62820e93c6a74a456f15fbc6f94f1a9c4dfe
+  languageName: node
+  linkType: hard
+
 "@rtsao/scc@npm:^1.1.0":
   version: 1.1.0
   resolution: "@rtsao/scc@npm:1.1.0"
@@ -1936,7 +2167,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dommatrix@npm:^1.0.3":
+"dommatrix@npm:^1.0.1":
   version: 1.0.3
   resolution: "dommatrix@npm:1.0.3"
   checksum: 10c0/498e630888ba138c1d140cbb25ca8dbd9ed747486aa0693dcc7a8318f910e4791d6b0fa4ef4c383c419b72e119fa2c26d9ee15a3c7b0e8088979cf02092e2a18
@@ -3763,18 +3994,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pdfjs-dist@npm:2.16.105":
-  version: 2.16.105
-  resolution: "pdfjs-dist@npm:2.16.105"
+"pdfjs-dist@npm:2.14.305":
+  version: 2.14.305
+  resolution: "pdfjs-dist@npm:2.14.305"
   dependencies:
-    dommatrix: "npm:^1.0.3"
+    dommatrix: "npm:^1.0.1"
     web-streams-polyfill: "npm:^3.2.1"
   peerDependencies:
     worker-loader: ^3.0.8
   peerDependenciesMeta:
     worker-loader:
       optional: true
-  checksum: 10c0/903a2d95fb3b8a2ec66fb3164813e6181512a144abc39b7f87a735fbcf3384b1d2ee3c6ed8dde70bfbe87c8ae5f87fea8c799c22a2ebe2669ed8573bc076d1f6
+  checksum: 10c0/c91d9b1e4fd9e55abb2a4864df928c3adc96f5280864131256adcf8b10fface549a275a46d9f911b58b04447e367113bfe890d64660a8f0d6809d044a88fbfe7
   languageName: node
   linkType: hard
 
@@ -3928,6 +4159,8 @@ __metadata:
   resolution: "receipt-app@workspace:."
   dependencies:
     "@eslint/eslintrc": "npm:^3"
+    "@react-pdf-viewer/core": "npm:^3.12.0"
+    "@react-pdf-viewer/default-layout": "npm:^3.12.0"
     "@tailwindcss/postcss": "npm:^4"
     "@types/node": "npm:^20"
     "@types/pdfjs-dist": "npm:^2.10.378"
@@ -3939,12 +4172,13 @@ __metadata:
     jspdf: "npm:^3.0.1"
     next: "npm:15.2.4"
     pdf-lib: "npm:^1.17.1"
-    pdfjs-dist: "npm:2.16.105"
+    pdfjs-dist: "npm:2.14.305"
     react: "npm:^19.0.0"
     react-dom: "npm:^19.0.0"
     react-dropzone: "npm:^14.3.8"
     tailwindcss: "npm:^4"
     typescript: "npm:^5"
+    uuid: "npm:^11.1.0"
   languageName: unknown
   linkType: soft
 
@@ -4845,6 +5079,15 @@ __metadata:
   dependencies:
     base64-arraybuffer: "npm:^1.0.2"
   checksum: 10c0/eaffe645bd81a39e4bc3abb23df5895e9961dbdd49748ef3b173529e8b06ce9dd1163e9705d5309a1c61ee41ffcb825e2043bc0fd1659845ffbdf4b1515dfdb4
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^11.1.0":
+  version: 11.1.0
+  resolution: "uuid@npm:11.1.0"
+  bin:
+    uuid: dist/esm/bin/uuid
+  checksum: 10c0/34aa51b9874ae398c2b799c88a127701408cd581ee89ec3baa53509dd8728cbb25826f2a038f9465f8b7be446f0fbf11558862965b18d21c993684297628d4d3
   languageName: node
   linkType: hard
 
