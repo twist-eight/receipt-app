@@ -36,6 +36,30 @@ export default async function handler(
       }),
     });
 
+    // デバッグ: レスポンスをテキストで取得して解析
+    const responseText = await response.text();
+
+    try {
+      const responseData = JSON.parse(responseText);
+
+      if (!response.ok) {
+        // Notion API からのエラー内容をそのまま返す
+        return res.status(response.status).json({
+          error: `Notion API error: ${responseData.message || "Unknown error"}`,
+          details: responseData,
+        });
+      }
+
+      return res.status(200).json(responseData);
+    } catch {
+      console.error("❌ Not JSON response from Notion API:", responseText);
+      return res.status(500).json({
+        error:
+          "Notion API did not return JSON. Possible wrong API key or endpoint.",
+        raw: responseText,
+      });
+    }
+
     const responseData = await response.json();
 
     // Notionからのエラーレスポンスを処理
