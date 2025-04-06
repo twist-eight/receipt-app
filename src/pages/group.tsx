@@ -6,16 +6,22 @@ import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../types/receipt";
 import ImageCarousel from "../components/ImageCarousel";
-import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function GroupPage() {
   const router = useRouter();
   const { receipts, setReceipts, removeReceipt } = useReceiptContext();
   const { mergePdfs } = usePdfProcessing();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [groupName, setGroupName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // カードサイズのオプションと状態
+  const sizeOptions = [
+    { value: "small", label: "小" },
+    { value: "medium", label: "中", default: true },
+    { value: "large", label: "大" },
+  ];
+  const [cardSize, setCardSize] = useState("medium");
 
   // アイテムの選択/選択解除
   const toggleSelection = (id: string) => {
@@ -31,6 +37,8 @@ export default function GroupPage() {
       return;
     }
 
+    setIsProcessing(true);
+
     try {
       const selectedItems = receipts.filter((item) =>
         selectedIds.includes(item.id)
@@ -44,16 +52,13 @@ export default function GroupPage() {
         imageUrls: mergedImageUrls,
         pdfUrl: mergedPdfUrl,
         date: selectedItems[0].date,
-        vendor: groupName || selectedItems[0].vendor,
+        vendor: selectedItems[0].vendor,
         amount: selectedItems.reduce(
           (sum, item) => sum + (item.amount || 0),
           0
         ),
         type: selectedItems[0].type,
-        memo: `グループ: ${
-          groupName ||
-          selectedItems.map((item) => item.vendor || "未設定").join(", ")
-        }`,
+        memo: `グループ化されたドキュメント`,
         tag: selectedItems[0].tag,
         status: selectedItems[0].status,
       };
@@ -89,11 +94,11 @@ export default function GroupPage() {
 
       // 選択解除
       setSelectedIds([]);
-      setGroupName("");
-      setIsConfirmDialogOpen(false);
     } catch (err) {
       console.error("グループ化に失敗しました:", err);
       setError("PDFのグループ化に失敗しました");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -102,7 +107,7 @@ export default function GroupPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-6 pb-24">
       <h1 className="text-xl font-bold mb-4">ドキュメントのグループ化</h1>
 
       {error && (
@@ -117,54 +122,88 @@ export default function GroupPage() {
         </div>
       )}
 
-      {/* アクションボタン */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {selectedIds.length >= 2 && (
-          <button
-            onClick={() => setIsConfirmDialogOpen(true)}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            選択したアイテムをグループ化 ({selectedIds.length})
-          </button>
-        )}
-
-        <button
-          onClick={handleNextStep}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 ml-auto"
-        >
-          次へ：OCR実行
-        </button>
+      {/* カードサイズ選択 */}
+      <div className="mb-4 flex items-center">
+        <span className="mr-2">カードサイズ:</span>
+        <div className="flex border rounded overflow-hidden">
+          {sizeOptions.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setCardSize(option.value)}
+              className={`px-3 py-1 text-sm ${
+                cardSize === option.value
+                  ? "bg-blue-500 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* グループ化確認ダイアログ */}
-      {isConfirmDialogOpen && (
-        <ConfirmDialog
-          title="アイテムをグループ化"
-          message={`選択した ${selectedIds.length} 個のアイテムをグループ化します。グループ名を入力してください（任意）。`}
-          confirmLabel="グループ化する"
-          cancelLabel="キャンセル"
-          onConfirm={handleCreateGroup}
-          onCancel={() => setIsConfirmDialogOpen(false)}
-          isDestructive={false}
-          extraContent={
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                グループ名
-              </label>
-              <input
-                type="text"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="例：○○社契約書"
-                className="w-full p-2 border rounded"
-              />
-            </div>
-          }
-        />
-      )}
+      {/* 常に表示される固定ボタンエリア */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-10">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          {selectedIds.length >= 2 ? (
+            <button
+              onClick={handleCreateGroup}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 flex items-center"
+            >
+              {isProcessing ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  処理中...
+                </>
+              ) : (
+                `選択したアイテムをグループ化 (${selectedIds.length})`
+              )}
+            </button>
+          ) : (
+            <span className="text-gray-500">
+              グループ化するアイテムを選択してください
+            </span>
+          )}
 
-      {/* アイテム一覧 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <button
+            onClick={handleNextStep}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            次へ：OCR実行
+          </button>
+        </div>
+      </div>
+
+      {/* アイテム一覧 - カードサイズに応じてグリッドを調整 */}
+      <div
+        className={`grid ${
+          cardSize === "small"
+            ? "grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+            : cardSize === "medium"
+            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            : "grid-cols-1 lg:grid-cols-2"
+        } gap-4`}
+      >
         {receipts.map((item) => (
           <div
             key={item.id}
@@ -190,7 +229,16 @@ export default function GroupPage() {
 
             {item.imageUrls && item.imageUrls.length > 0 && (
               <div className="mb-2">
-                <ImageCarousel images={item.imageUrls} />
+                <ImageCarousel
+                  images={item.imageUrls}
+                  className={`${
+                    cardSize === "small"
+                      ? "h-24"
+                      : cardSize === "medium"
+                      ? "h-80"
+                      : "h-120"
+                  }`}
+                />
                 {item.imageUrls.length > 1 && (
                   <p className="text-xs text-center mt-1">
                     {item.imageUrls.length}ページ
@@ -199,10 +247,21 @@ export default function GroupPage() {
               </div>
             )}
 
-            <p className="text-sm font-medium truncate">
-              {item.vendor || "未設定の取引先"}
-            </p>
-            <p className="text-xs text-gray-500">{item.date || "日付なし"}</p>
+            {item.vendor && (
+              <p
+                className={`font-medium truncate ${
+                  cardSize === "small"
+                    ? "text-xs"
+                    : cardSize === "medium"
+                    ? "text-sm"
+                    : "text-base"
+                }`}
+              >
+                {item.vendor}
+              </p>
+            )}
+
+            {item.date && <p className="text-xs text-gray-500">{item.date}</p>}
           </div>
         ))}
       </div>
