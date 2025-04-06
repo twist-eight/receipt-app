@@ -102,7 +102,8 @@ export default function GroupPage() {
         id: uuidv4(),
         imageUrls: mergedImageUrls,
         pdfUrl: mergedPdfUrl,
-        date: selectedItems[0].date,
+        date: selectedItems[0].date, // 元の日付を保持
+        updatedAt: new Date().toISOString().split("T")[0], // 今日の日付を追加
         vendor: selectedItems[0].vendor,
         amount: selectedItems.reduce(
           (sum, item) => sum + (item.amount || 0),

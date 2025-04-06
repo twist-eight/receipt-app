@@ -207,6 +207,7 @@ export function usePdfProcessing() {
 
     try {
       const results: ReceiptItem[] = [];
+      const today = new Date().toISOString().split("T")[0]; // 今日の日付
 
       for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
         const file = files[fileIndex];
@@ -224,7 +225,8 @@ export function usePdfProcessing() {
               id: uuidv4(),
               imageUrls, // 全ページ分の画像を保存
               pdfUrl,
-              date: new Date().toISOString().split("T")[0],
+              date: "", // 日付を空に変更
+              updatedAt: today, // 更新日を追加
               vendor: "",
               amount: 0,
               type: "領収書", // デフォルト値
@@ -241,7 +243,8 @@ export function usePdfProcessing() {
                 id: uuidv4(),
                 imageUrls: [page.imageUrl], // 配列として保存
                 pdfUrl: page.pdfUrl,
-                date: new Date().toISOString().split("T")[0],
+                date: "", // 日付を空に変更
+                updatedAt: today, // 更新日を追加
                 vendor: "",
                 amount: 0,
                 type: "領収書", // デフォルト値
@@ -259,7 +262,8 @@ export function usePdfProcessing() {
             id: uuidv4(),
             imageUrls: [imageUrl], // 配列として保存
             pdfUrl,
-            date: new Date().toISOString().split("T")[0],
+            date: "", // 日付を空に変更
+            updatedAt: today, // 更新日を追加
             vendor: "",
             amount: 0,
             type: "領収書", // デフォルト値

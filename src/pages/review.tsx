@@ -153,6 +153,7 @@ export default function ReviewPage() {
         imageUrls: mergedImageUrls, // 全てのページの画像URLを配列として保存
         pdfUrl: mergedPdfUrl,
         date: selectedItems[0].date,
+        updatedAt: new Date().toISOString().split("T")[0], // 今日の日付を追加
         vendor: selectedItems[0].vendor,
         amount: selectedItems.reduce(
           (sum, item) => sum + (item.amount || 0),
@@ -208,6 +209,7 @@ export default function ReviewPage() {
         imageUrls: ["/sample.jpg"], // 配列に変更
         pdfUrl: "/sample.pdf",
         date: "2025-04-01",
+        updatedAt: new Date().toISOString().split("T")[0], // 今日の日付を追加
         vendor: "テスト商店",
         amount: 1234,
         type: "領収書",
