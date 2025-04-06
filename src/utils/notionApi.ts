@@ -1,10 +1,6 @@
 import { ReceiptItem } from "../types/receipt";
 import { Client } from "../types/client";
 
-// Notion APIの基本設定
-const NOTION_API_BASE_URL = "https://api.notion.com/v1";
-const NOTION_VERSION = "2022-06-28";
-
 // Notion APIの型定義
 interface NotionPropertyValueObject {
   title?: Array<{ text: { content: string } }>;
@@ -46,7 +42,7 @@ interface NotionDatabaseQueryFilter {
   [key: string]: unknown;
 }
 
-// Notion APIクライアント
+// Notion APIクライアント - API Routesを使用するよう変更
 export class NotionApiClient {
   private apiKey: string;
 
@@ -54,30 +50,27 @@ export class NotionApiClient {
     this.apiKey = apiKey;
   }
 
-  // ヘッダー生成
-  private getHeaders() {
-    return {
-      Authorization: `Bearer ${this.apiKey}`,
-      "Notion-Version": NOTION_VERSION,
-      "Content-Type": "application/json",
-    };
-  }
-
   // データベースにページを作成
   async createPage(databaseId: string, properties: NotionPropertyMap) {
     try {
-      const response = await fetch(`${NOTION_API_BASE_URL}/pages`, {
+      // Next.jsのAPIルートを使用
+      const response = await fetch("/api/notion/create-page", {
         method: "POST",
-        headers: this.getHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          parent: { database_id: databaseId },
+          databaseId,
           properties,
+          apiKey: this.apiKey,
         }),
       });
 
       if (!response.ok) {
-        const errorData = (await response.json()) as { message: string };
-        throw new Error(`Failed to create page: ${errorData.message}`);
+        const errorData = await response.json();
+        throw new Error(
+          `Failed to create page: ${errorData.error || "Unknown error"}`
+        );
       }
 
       return await response.json();
@@ -90,21 +83,24 @@ export class NotionApiClient {
   // データベースを検索
   async queryDatabase(databaseId: string, filter?: NotionDatabaseQueryFilter) {
     try {
-      const requestBody: { filter?: NotionDatabaseQueryFilter } = {};
-      if (filter) requestBody.filter = filter;
-
-      const response = await fetch(
-        `${NOTION_API_BASE_URL}/databases/${databaseId}/query`,
-        {
-          method: "POST",
-          headers: this.getHeaders(),
-          body: JSON.stringify(requestBody),
-        }
-      );
+      // Next.jsのAPIルートを使用
+      const response = await fetch("/api/notion/query-database", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          databaseId,
+          filter,
+          apiKey: this.apiKey,
+        }),
+      });
 
       if (!response.ok) {
-        const errorData = (await response.json()) as { message: string };
-        throw new Error(`Failed to query database: ${errorData.message}`);
+        const errorData = await response.json();
+        throw new Error(
+          `Failed to query database: ${errorData.error || "Unknown error"}`
+        );
       }
 
       return await response.json();
@@ -152,7 +148,7 @@ export function receiptToNotionProperties(
         },
       ],
     },
-    // ドキュメントタイプ
+    // ドキュメント種類
     ドキュメント種類: {
       select: {
         name: receipt.type,
