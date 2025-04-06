@@ -1,6 +1,6 @@
 import React from "react";
-import Image from "next/image";
 import { ReceiptItem } from "../types/receipt";
+import ImageCarousel from "./ImageCarousel";
 
 interface ReceiptCardProps {
   receipt: ReceiptItem;
@@ -63,14 +63,15 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
           </div>
         )}
 
-        {receipt.imageUrl && (
-          <div className="relative w-32 h-40 border rounded overflow-hidden">
-            <Image
-              src={receipt.imageUrl}
-              alt="レシート画像"
-              fill
-              className="object-contain rounded"
-            />
+        {/* Use ImageCarousel instead of single Image */}
+        {receipt.imageUrls && receipt.imageUrls.length > 0 && (
+          <div className="w-32">
+            <ImageCarousel images={receipt.imageUrls} />
+            {receipt.imageUrls.length > 1 && (
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                {receipt.imageUrls.length}ページ
+              </p>
+            )}
           </div>
         )}
 

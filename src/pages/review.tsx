@@ -70,8 +70,12 @@ export default function ReviewPage() {
 
     // BlobURLを解放
     try {
-      if (receiptToDelete.imageUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(receiptToDelete.imageUrl);
+      if (receiptToDelete.imageUrls) {
+        receiptToDelete.imageUrls.forEach((imageUrl) => {
+          if (imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(imageUrl);
+          }
+        });
       }
       if (receiptToDelete.pdfUrl.startsWith("blob:")) {
         URL.revokeObjectURL(receiptToDelete.pdfUrl);
@@ -92,12 +96,16 @@ export default function ReviewPage() {
   const handleClearAllData = () => {
     // BlobURLを解放
     receipts.forEach((receipt) => {
-      if (receipt.imageUrl.startsWith("blob:")) {
-        try {
-          URL.revokeObjectURL(receipt.imageUrl);
-        } catch (e) {
-          console.error("Failed to revoke image URL:", e);
-        }
+      if (receipt.imageUrls) {
+        receipt.imageUrls.forEach((imageUrl) => {
+          if (imageUrl.startsWith("blob:")) {
+            try {
+              URL.revokeObjectURL(imageUrl);
+            } catch (e) {
+              console.error("Failed to revoke image URL:", e);
+            }
+          }
+        });
       }
       if (receipt.pdfUrl.startsWith("blob:")) {
         try {
@@ -123,7 +131,7 @@ export default function ReviewPage() {
     }
   };
 
-  const handleGroupConfirm = async (groupName: string) => {
+  const handleGroupConfirm = async () => {
     if (selectedItemIds.length < 2) {
       setError("グループ化するには2つ以上のアイテムを選択してください");
       return;
@@ -137,15 +145,15 @@ export default function ReviewPage() {
 
       // PDFをマージ
       const pdfUrls = selectedItems.map((item) => item.pdfUrl);
-      const { mergedPdfUrl, mergedImageUrl } = await mergePdfs(pdfUrls);
+      const { mergedPdfUrl, mergedImageUrls } = await mergePdfs(pdfUrls);
 
-      // 新しいグループアイテムを作成
+      // 新しいグループアイテムを作成 (グループ名なしで)
       const newGroupItem: ReceiptItem = {
         id: uuidv4(),
-        imageUrl: mergedImageUrl,
+        imageUrls: mergedImageUrls, // 全てのページの画像URLを配列として保存
         pdfUrl: mergedPdfUrl,
         date: selectedItems[0].date,
-        vendor: groupName || selectedItems[0].vendor,
+        vendor: selectedItems[0].vendor,
         amount: selectedItems.reduce(
           (sum, item) => sum + (item.amount || 0),
           0
@@ -163,10 +171,14 @@ export default function ReviewPage() {
         const item = receipts.find((r) => r.id === id);
         if (item) {
           // BlobURLを解放
-          if (item.imageUrl.startsWith("blob:")) {
-            try {
-              URL.revokeObjectURL(item.imageUrl);
-            } catch {}
+          if (item.imageUrls) {
+            item.imageUrls.forEach((url) => {
+              if (url.startsWith("blob:")) {
+                try {
+                  URL.revokeObjectURL(url);
+                } catch {}
+              }
+            });
           }
           if (item.pdfUrl.startsWith("blob:")) {
             try {
@@ -193,7 +205,7 @@ export default function ReviewPage() {
     const testData: ReceiptItem[] = [
       {
         id: "test001",
-        imageUrl: "/sample.jpg",
+        imageUrls: ["/sample.jpg"], // 配列に変更
         pdfUrl: "/sample.pdf",
         date: "2025-04-01",
         vendor: "テスト商店",

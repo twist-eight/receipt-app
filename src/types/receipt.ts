@@ -1,6 +1,6 @@
 export interface ReceiptItem {
   id: string;
-  imageUrl: string;
+  imageUrls: string[]; // Changed from imageUrl to imageUrls array
   pdfUrl: string;
   date: string;
   vendor: string;

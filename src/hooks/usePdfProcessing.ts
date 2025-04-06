@@ -42,6 +42,26 @@ export function usePdfProcessing() {
     }
   };
 
+  // PDFの全ページを画像に変換する
+  const pdfToImages = async (pdfData: Uint8Array): Promise<string[]> => {
+    try {
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      const totalPages = pdf.numPages;
+      const imageUrls: string[] = [];
+
+      for (let i = 0; i < totalPages; i++) {
+        const imageUrl = await pdfPageToImage(pdfData, i);
+        imageUrls.push(imageUrl);
+      }
+
+      return imageUrls;
+    } catch (err) {
+      console.error("Error converting PDF to images:", err);
+      setError("PDFから画像への変換に失敗しました");
+      throw err;
+    }
+  };
+
   // 複数ページPDFを個別のPDFに分割
   const splitPdfPages = async (
     file: File
@@ -112,10 +132,10 @@ export function usePdfProcessing() {
     }
   };
 
-  // PDFをマージする関数
+  // PDFをマージする関数（修正版）
   const mergePdfs = async (
     pdfUrls: string[]
-  ): Promise<{ mergedPdfUrl: string; mergedImageUrl: string }> => {
+  ): Promise<{ mergedPdfUrl: string; mergedImageUrls: string[] }> => {
     if (pdfUrls.length < 2) {
       throw new Error("At least two PDFs are required for merging");
     }
@@ -167,17 +187,17 @@ export function usePdfProcessing() {
       });
       const mergedPdfUrl = URL.createObjectURL(mergedPdfBlob);
 
-      // 最初のページをサムネイル画像として使用
-      const mergedImageUrl = await pdfPageToImage(mergedPdfBytes, 0);
+      // 全ページをサムネイル画像として使用
+      const mergedImageUrls = await pdfToImages(mergedPdfBytes);
 
-      return { mergedPdfUrl, mergedImageUrl };
+      return { mergedPdfUrl, mergedImageUrls };
     } catch (err) {
       console.error("Failed to merge PDFs:", err);
       throw new Error("PDFのマージに失敗しました");
     }
   };
 
-  // ファイルを処理して受領書アイテムを作成
+  // ファイルを処理して受領書アイテムを作成（修正版）
   const processFiles = async (
     files: File[],
     mergeMode: boolean
@@ -195,14 +215,14 @@ export function usePdfProcessing() {
           if (mergeMode) {
             // 複数ページのPDFを1つの受領書として扱う
             const pdfUrl = URL.createObjectURL(file);
-            const imageUrl = await pdfPageToImage(
-              new Uint8Array(await file.arrayBuffer()),
-              0
-            );
+            const fileData = new Uint8Array(await file.arrayBuffer());
+
+            // 全ページの画像を取得
+            const imageUrls = await pdfToImages(fileData);
 
             results.push({
               id: uuidv4(),
-              imageUrl,
+              imageUrls, // 全ページ分の画像を保存
               pdfUrl,
               date: new Date().toISOString().split("T")[0],
               vendor: "",
@@ -219,7 +239,7 @@ export function usePdfProcessing() {
             pages.forEach((page) => {
               results.push({
                 id: uuidv4(),
-                imageUrl: page.imageUrl,
+                imageUrls: [page.imageUrl], // 配列として保存
                 pdfUrl: page.pdfUrl,
                 date: new Date().toISOString().split("T")[0],
                 vendor: "",
@@ -237,7 +257,7 @@ export function usePdfProcessing() {
 
           results.push({
             id: uuidv4(),
-            imageUrl,
+            imageUrls: [imageUrl], // 配列として保存
             pdfUrl,
             date: new Date().toISOString().split("T")[0],
             vendor: "",
@@ -263,6 +283,7 @@ export function usePdfProcessing() {
   return {
     processFiles,
     pdfPageToImage,
+    pdfToImages,
     splitPdfPages,
     convertImageToPdf,
     mergePdfs,
