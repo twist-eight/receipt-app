@@ -3,10 +3,12 @@ import { useRouter } from "next/router";
 import FileUploader from "../components/FileUploader";
 import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { useReceiptContext } from "../contexts/ReceiptContext";
+import { ReceiptType } from "../types/receipt";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [mergeMode, setMergeMode] = useState(false);
+  const [selectedType, setSelectedType] = useState<ReceiptType | null>(null);
   const router = useRouter();
   const {
     processFiles,
@@ -16,13 +18,26 @@ export default function UploadPage() {
   const { setReceipts } = useReceiptContext();
   const [error, setError] = useState<string | null>(null);
 
+  // 種類のオプション
+  const typeOptions: ReceiptType[] = [
+    "領収書",
+    "明細書",
+    "契約書",
+    "見積書",
+    "通帳",
+  ];
+
   // ファイルの選択処理
   const handleFilesChange = (selectedFiles: File[]) => {
     setFiles(selectedFiles);
   };
 
-  // アップロード処理
+  // 種類選択処理
+  const handleTypeSelect = (type: ReceiptType) => {
+    setSelectedType(selectedType === type ? null : type);
+  };
 
+  // アップロード処理
   const handleUpload = async () => {
     if (files.length === 0) {
       setError("ファイルをアップロードしてください");
@@ -36,6 +51,13 @@ export default function UploadPage() {
       const results = await processFiles(files, mergeMode);
 
       if (results.length > 0) {
+        // 選択した種類がある場合、すべての結果に適用
+        if (selectedType) {
+          results.forEach((result) => {
+            result.type = selectedType;
+          });
+        }
+
         // ReceiptContext を通じて結果を保存
         setReceipts(results);
 
@@ -74,6 +96,30 @@ export default function UploadPage() {
         <label htmlFor="merge-mode" className="cursor-pointer">
           複数ページPDFを1件として保存（明細書など）
         </label>
+      </div>
+
+      {/* 種類選択ボタン */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-2">ドキュメント種類（任意）：</p>
+        <div className="flex flex-wrap gap-2">
+          {typeOptions.map((type) => (
+            <button
+              key={type}
+              onClick={() => handleTypeSelect(type)}
+              className={`px-3 py-2 rounded ${
+                selectedType === type
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              type="button"
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          選択するとすべてのファイルに適用されます。選択しない場合はデフォルト（領収書）が適用されます。
+        </p>
       </div>
 
       {/* エラー表示 -processFiles からのエラーとローカルのエラーを両方表示 */}

@@ -227,7 +227,7 @@ export function usePdfProcessing() {
               date: new Date().toISOString().split("T")[0],
               vendor: "",
               amount: 0,
-              type: "領収書",
+              type: "領収書", // デフォルト値
               memo: "",
               tag: "",
               status: "完了",
@@ -244,7 +244,7 @@ export function usePdfProcessing() {
                 date: new Date().toISOString().split("T")[0],
                 vendor: "",
                 amount: 0,
-                type: "領収書",
+                type: "領収書", // デフォルト値
                 memo: "",
                 tag: "",
                 status: "完了",
@@ -262,7 +262,7 @@ export function usePdfProcessing() {
             date: new Date().toISOString().split("T")[0],
             vendor: "",
             amount: 0,
-            type: "領収書",
+            type: "領収書", // デフォルト値
             memo: "",
             tag: "",
             status: "完了",
