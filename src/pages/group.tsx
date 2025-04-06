@@ -6,6 +6,7 @@ import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../types/receipt";
 import ImageCarousel from "../components/ImageCarousel";
+import ConfirmDialog from "../components/ConfirmDialog"; // 追加：確認ダイアログのインポート
 
 export default function GroupPage() {
   const router = useRouter();
@@ -14,6 +15,9 @@ export default function GroupPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  // 追加：削除確認用の状態
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   // カードサイズのオプションと状態
   const sizeOptions = [
@@ -30,7 +34,54 @@ export default function GroupPage() {
     );
   };
 
+  // 追加：削除ボタンクリック時の処理
+  const handleDeleteClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // カードの選択イベントが発火しないようにする
+    setItemToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // 追加：削除処理の実行
+  const handleConfirmDelete = () => {
+    if (!itemToDelete) return;
+
+    const item = receipts.find((r) => r.id === itemToDelete);
+    if (item) {
+      // Blob URLの解放
+      if (item.imageUrls) {
+        item.imageUrls.forEach((url) => {
+          if (url.startsWith("blob:")) {
+            try {
+              URL.revokeObjectURL(url);
+            } catch (e) {
+              console.error("Failed to revoke image URL:", e);
+            }
+          }
+        });
+      }
+      if (item.pdfUrl.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(item.pdfUrl);
+        } catch (e) {
+          console.error("Failed to revoke PDF URL:", e);
+        }
+      }
+
+      // 選択リストからも削除
+      setSelectedIds((prev) => prev.filter((id) => id !== itemToDelete));
+
+      // アイテムを削除
+      removeReceipt(itemToDelete);
+    }
+
+    // ダイアログを閉じてリセット
+    setIsDeleteDialogOpen(false);
+    setItemToDelete(null);
+  };
+
   // グループ化処理
+  // 既存のコードをそのまま使用
+
   const handleCreateGroup = async () => {
     if (selectedIds.length < 2) {
       setError("グループ化するには2つ以上のアイテムを選択してください");
@@ -142,6 +193,22 @@ export default function GroupPage() {
         </div>
       </div>
 
+      {/* 削除確認ダイアログ（追加） */}
+      {isDeleteDialogOpen && (
+        <ConfirmDialog
+          title="ドキュメントの削除"
+          message="このドキュメントを削除してもよろしいですか？この操作は元に戻せません。"
+          confirmLabel="削除する"
+          cancelLabel="キャンセル"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setIsDeleteDialogOpen(false);
+            setItemToDelete(null);
+          }}
+          isDestructive={true}
+        />
+      )}
+
       {/* 常に表示される固定ボタンエリア */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -195,6 +262,7 @@ export default function GroupPage() {
       </div>
 
       {/* アイテム一覧 - カードサイズに応じてグリッドを調整 */}
+
       <div
         className={`grid ${
           cardSize === "small"
@@ -207,14 +275,36 @@ export default function GroupPage() {
         {receipts.map((item) => (
           <div
             key={item.id}
-            className={`border p-4 rounded cursor-pointer transition-all ${
+            className={`border p-4 rounded cursor-pointer transition-all relative ${
               selectedIds.includes(item.id)
                 ? "border-blue-500 bg-blue-50"
                 : "border-gray-300 hover:border-blue-300"
             }`}
             onClick={() => toggleSelection(item.id)}
           >
-            <div className="flex justify-between mb-2">
+            {/* 削除ボタン */}
+            <button
+              onClick={(e) => handleDeleteClick(item.id, e)}
+              className="absolute top-2 right-2 z-10 text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors"
+              aria-label="削除"
+              title="このドキュメントを削除"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+
+            {/* チェックボックスのみ表示 - IDは削除 */}
+            <div className="mb-2">
               <input
                 type="checkbox"
                 checked={selectedIds.includes(item.id)}
@@ -222,9 +312,6 @@ export default function GroupPage() {
                 className="h-5 w-5"
                 onClick={(e) => e.stopPropagation()}
               />
-              <span className="text-xs text-gray-500">
-                ID: {item.id.substring(0, 8)}...
-              </span>
             </div>
 
             {item.imageUrls && item.imageUrls.length > 0 && (
@@ -261,7 +348,10 @@ export default function GroupPage() {
               </p>
             )}
 
-            {item.date && <p className="text-xs text-gray-500">{item.date}</p>}
+            {/* 日付の表示を削除し、IDを左下に配置 */}
+            <p className="text-xs text-gray-500 mt-2">
+              ID: {item.id.substring(0, 8)}...
+            </p>
           </div>
         ))}
       </div>
