@@ -15,6 +15,12 @@ export default function App({ Component, pageProps }: AppProps) {
             <Link href="/upload" className="text-blue-600 hover:underline">
               📤 アップロード
             </Link>
+            <Link href="/group" className="text-blue-600 hover:underline">
+              🔗 グループ化
+            </Link>
+            <Link href="/ocr" className="text-blue-600 hover:underline">
+              🔍 OCR実行
+            </Link>
             <Link href="/review" className="text-blue-600 hover:underline">
               🧐 レビュー
             </Link>

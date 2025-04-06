@@ -22,6 +22,7 @@ export default function UploadPage() {
   };
 
   // アップロード処理
+
   const handleUpload = async () => {
     if (files.length === 0) {
       setError("ファイルをアップロードしてください");
@@ -31,15 +32,15 @@ export default function UploadPage() {
     setError(null);
 
     try {
-      // usePdfProcessing フックを使用してファイルを処理
+      // OCR実行を削除し、ファイルの処理のみを行う
       const results = await processFiles(files, mergeMode);
 
       if (results.length > 0) {
-        // ReceiptContext を通じて結果を保存（内部でセッションストレージを更新）
+        // ReceiptContext を通じて結果を保存
         setReceipts(results);
 
-        // 処理が完了したらレビューページに遷移
-        router.push("/review");
+        // 処理が完了したらグループ化ページに遷移
+        router.push("/group");
       } else {
         setError("ファイルの処理結果が得られませんでした");
       }
@@ -114,7 +115,7 @@ export default function UploadPage() {
                 処理中...
               </>
             ) : (
-              "OCR実行（新規）"
+              "実行（新規）"
             )}
           </button>
         </div>
