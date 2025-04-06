@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { v4 as uuidv4 } from "uuid"; // この依存関係を追加する必要があります
+import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../types/receipt";
 
 // PDFワーカーの設定
@@ -112,6 +112,71 @@ export function usePdfProcessing() {
     }
   };
 
+  // PDFをマージする関数
+  const mergePdfs = async (
+    pdfUrls: string[]
+  ): Promise<{ mergedPdfUrl: string; mergedImageUrl: string }> => {
+    if (pdfUrls.length < 2) {
+      throw new Error("At least two PDFs are required for merging");
+    }
+
+    try {
+      // 空のPDFドキュメントを作成
+      const mergedPdfDoc = await PDFDocument.create();
+
+      // 各PDFを読み込んでマージ
+      for (const pdfUrl of pdfUrls) {
+        let pdfData: Uint8Array;
+
+        if (pdfUrl.startsWith("blob:")) {
+          // Blob URLからデータを取得
+          const response = await fetch(pdfUrl);
+          const blob = await response.blob();
+          pdfData = new Uint8Array(await blob.arrayBuffer());
+        } else if (pdfUrl.startsWith("data:application/pdf")) {
+          // Data URLからデータを取得
+          const base64Data = pdfUrl.split(",")[1];
+          const binaryString = atob(base64Data);
+          pdfData = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            pdfData[i] = binaryString.charCodeAt(i);
+          }
+        } else {
+          throw new Error(`Unsupported PDF URL format: ${pdfUrl}`);
+        }
+
+        // PDFドキュメントを読み込む
+        const pdfDoc = await PDFDocument.load(pdfData);
+
+        // ページをコピー
+        const copiedPages = await mergedPdfDoc.copyPages(
+          pdfDoc,
+          pdfDoc.getPageIndices()
+        );
+
+        // ページを追加
+        copiedPages.forEach((page) => {
+          mergedPdfDoc.addPage(page);
+        });
+      }
+
+      // マージしたPDFを保存
+      const mergedPdfBytes = await mergedPdfDoc.save();
+      const mergedPdfBlob = new Blob([mergedPdfBytes], {
+        type: "application/pdf",
+      });
+      const mergedPdfUrl = URL.createObjectURL(mergedPdfBlob);
+
+      // 最初のページをサムネイル画像として使用
+      const mergedImageUrl = await pdfPageToImage(mergedPdfBytes, 0);
+
+      return { mergedPdfUrl, mergedImageUrl };
+    } catch (err) {
+      console.error("Failed to merge PDFs:", err);
+      throw new Error("PDFのマージに失敗しました");
+    }
+  };
+
   // ファイルを処理して受領書アイテムを作成
   const processFiles = async (
     files: File[],
@@ -200,6 +265,7 @@ export function usePdfProcessing() {
     pdfPageToImage,
     splitPdfPages,
     convertImageToPdf,
+    mergePdfs,
     isProcessing,
     error,
   };
