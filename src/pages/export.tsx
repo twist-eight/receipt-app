@@ -498,7 +498,7 @@ export default function ExportPage() {
                 {syncStatus.success + syncStatus.failed}
               </span>
             ) : (
-              "Notionにエクスポート"
+              "Notionに登録"
             )}
           </button>
         </div>

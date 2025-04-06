@@ -47,7 +47,7 @@ export default function App({ Component, pageProps }: AppProps) {
                 href="/export"
                 className="text-blue-600 hover:underline whitespace-nowrap"
               >
-                📄 CSV出力
+                📄 Notion登録
               </Link>
               {/* 以下を追加 */}
               <Link
