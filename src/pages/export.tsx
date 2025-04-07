@@ -292,7 +292,7 @@ export default function ExportPage() {
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
-          title="Supabaseへエクスポート"
+          title="Supabaseへ登録"
           message={`選択した${
             Object.values(receiptSelection).filter(Boolean).length
           }件のレシートをSupabaseデータベースにエクスポートします。この操作は取り消せません。`}
@@ -321,7 +321,7 @@ export default function ExportPage() {
       {/* レシート選択 */}
       <div className="mb-20">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">エクスポートするデータ選択</h2>
+          <h2 className="text-lg font-semibold">登録するデータ選択</h2>
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -335,7 +335,7 @@ export default function ExportPage() {
         </div>
 
         {receipts.length === 0 ? (
-          <p className="text-gray-500">エクスポート可能なデータがありません</p>
+          <p className="text-gray-500">登録可能なデータがありません</p>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">

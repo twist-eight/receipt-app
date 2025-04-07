@@ -42,16 +42,10 @@ export default function App({ Component, pageProps }: AppProps) {
                 🧐 レビュー
               </Link>
               <Link
-                href="/register"
-                className="text-blue-600 hover:underline whitespace-nowrap"
-              >
-                📄 Supabase登録
-              </Link>
-              <Link
                 href="/export"
                 className="text-blue-600 hover:underline whitespace-nowrap"
               >
-                📊 Supabaseエクスポート
+                📊 Supabaseへ登録
               </Link>
               <Link
                 href="/clients"
