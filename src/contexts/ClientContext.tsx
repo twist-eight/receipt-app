@@ -5,18 +5,25 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { v4 as uuidv4 } from "uuid";
 import { Client } from "../types/client";
+import {
+  fetchClients,
+  createClient as apiCreateClient,
+  updateClient as apiUpdateClient,
+  deleteClient as apiDeleteClient,
+} from "../utils/clientApi";
 
 interface ClientContextType {
   clients: Client[];
   setClients: (clients: Client[]) => void;
-  addClient: (client: Client) => void;
-  updateClient: (id: string, updates: Partial<Client>) => void;
-  removeClient: (id: string) => void;
+  addClient: (client: Omit<Client, "id">) => Promise<void>;
+  updateClient: (id: string, updates: Partial<Client>) => Promise<void>;
+  removeClient: (id: string) => Promise<void>;
   getClientById: (id: string) => Client | undefined;
   selectedClientId: string | null;
   setSelectedClientId: (id: string | null) => void;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
@@ -34,48 +41,99 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // LocalStorageからクライアント情報を読み込み
+  // 初期データの読み込み
   useEffect(() => {
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
+    const loadClients = async () => {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        const parsed = JSON.parse(storedClients);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setClients(parsed);
+        const response = await fetchClients();
+
+        if (response.success && response.data) {
+          setClients(response.data);
+        } else {
+          setError(response.error || "顧問先の取得に失敗しました");
         }
-      } catch (e) {
-        console.error("Failed to parse stored clients:", e);
+      } catch (err) {
+        console.error("Failed to load clients:", err);
+        setError("データの読み込み中にエラーが発生しました");
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    loadClients();
   }, []);
 
-  // クライアント情報が変更されたらLocalStorageに保存
-  useEffect(() => {
-    if (clients.length > 0) {
-      localStorage.setItem("clients", JSON.stringify(clients));
+  const addClient = async (client: Omit<Client, "id">) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiCreateClient(client);
+
+      if (response.success && response.data) {
+        setClients((prev) => [...prev, response.data]);
+      } else {
+        setError(response.error || "顧問先の追加に失敗しました");
+      }
+    } catch (err) {
+      console.error("Failed to add client:", err);
+      setError("顧問先の追加中にエラーが発生しました");
+    } finally {
+      setIsLoading(false);
     }
-  }, [clients]);
-
-  const addClient = (client: Client) => {
-    // IDが指定されていない場合は生成する
-    const newClient = {
-      ...client,
-      id: client.id || uuidv4(),
-    };
-    setClients((prev) => [...prev, newClient]);
   };
 
-  const updateClient = (id: string, updates: Partial<Client>) => {
-    setClients((prev) =>
-      prev.map((client) =>
-        client.id === id ? { ...client, ...updates } : client
-      )
-    );
+  const updateClient = async (id: string, updates: Partial<Client>) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiUpdateClient(id, updates);
+
+      if (response.success && response.data) {
+        setClients((prev) =>
+          prev.map((client) => (client.id === id ? response.data : client))
+        );
+      } else {
+        setError(response.error || "顧問先の更新に失敗しました");
+      }
+    } catch (err) {
+      console.error("Failed to update client:", err);
+      setError("顧問先の更新中にエラーが発生しました");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const removeClient = (id: string) => {
-    setClients((prev) => prev.filter((client) => client.id !== id));
+  const removeClient = async (id: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiDeleteClient(id);
+
+      if (response.success) {
+        setClients((prev) => prev.filter((client) => client.id !== id));
+
+        // 削除した顧問先が選択中だった場合、選択をクリア
+        if (selectedClientId === id) {
+          setSelectedClientId(null);
+        }
+      } else {
+        setError(response.error || "顧問先の削除に失敗しました");
+      }
+    } catch (err) {
+      console.error("Failed to remove client:", err);
+      setError("顧問先の削除中にエラーが発生しました");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getClientById = (id: string) => {
@@ -91,6 +149,8 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
     getClientById,
     selectedClientId,
     setSelectedClientId,
+    isLoading,
+    error,
   };
 
   return (
