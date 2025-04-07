@@ -1,12 +1,30 @@
+// src/utils/receiptApi.ts
 import { supabase } from "./supabaseClient";
 import { ReceiptItem } from "../types/receipt";
 import { v4 as uuidv4 } from "uuid";
+
+// Supabaseデータベースのレシートテーブル構造に対応する型
+interface ReceiptDatabaseRecord {
+  id: string;
+  client_id: string | null;
+  vendor: string;
+  amount: number;
+  date: string | null;
+  pdf_path: string;
+  pdf_name: string;
+  type: string;
+  memo: string;
+  tag: string;
+  status: string;
+  created_at?: string;
+  updated_at: string;
+}
 
 // PDFをアップロードしてレシートを作成する関数
 export async function uploadPdfAndCreateReceipt(
   file: File,
   receiptData: Partial<ReceiptItem>
-): Promise<{ success: boolean; data?: any; error?: string }> {
+): Promise<{ success: boolean; data?: ReceiptDatabaseRecord; error?: string }> {
   try {
     // ファイル名をユニークにするためにUUIDを追加
     const fileExtension = file.name.split(".").pop();
@@ -132,7 +150,7 @@ export async function fetchReceipts(): Promise<{
 export async function updateReceipt(
   id: string,
   updates: Partial<ReceiptItem>
-): Promise<{ success: boolean; data?: any; error?: string }> {
+): Promise<{ success: boolean; data?: ReceiptDatabaseRecord; error?: string }> {
   try {
     // データベースのレシート情報を更新
     const { data, error } = await supabase

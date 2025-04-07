@@ -1,3 +1,4 @@
+// src/contexts/ClientContext.tsx
 import React, {
   createContext,
   useContext,
@@ -77,7 +78,8 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
       const response = await apiCreateClient(client);
 
       if (response.success && response.data) {
-        setClients((prev) => [...prev, response.data]);
+        // 明示的な型アサーションを追加して、response.dataがClientであることを保証
+        setClients((prev) => [...prev, response.data as Client]);
       } else {
         setError(response.error || "顧問先の追加に失敗しました");
       }
@@ -97,8 +99,11 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
       const response = await apiUpdateClient(id, updates);
 
       if (response.success && response.data) {
+        // 明示的な型アサーションを追加して、response.dataがClientであることを保証
         setClients((prev) =>
-          prev.map((client) => (client.id === id ? response.data : client))
+          prev.map((client) =>
+            client.id === id ? (response.data as Client) : client
+          )
         );
       } else {
         setError(response.error || "顧問先の更新に失敗しました");

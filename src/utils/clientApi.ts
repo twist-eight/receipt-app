@@ -1,5 +1,17 @@
+// src/utils/clientApi.ts
 import { supabase } from "./supabaseClient";
-import { Client } from "../types/client";
+import { Client, DocumentTypeConfig } from "../types/client";
+
+// Supabaseのデータベーステーブルの型を定義
+interface ClientDatabaseRecord {
+  id: string;
+  name: string;
+  notion_database_id: string;
+  notion_api_key?: string;
+  document_types: DocumentTypeConfig[]; // any[]から具体的な型に変更
+  updated_at: string;
+  created_at: string;
+}
 
 // 顧問先を取得する関数
 export async function fetchClients(): Promise<{
@@ -83,7 +95,7 @@ export async function updateClient(
   updates: Partial<Client>
 ): Promise<{ success: boolean; data?: Client; error?: string }> {
   try {
-    const updateData: any = {};
+    const updateData: Partial<ClientDatabaseRecord> = {};
 
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.notionDatabaseId !== undefined)

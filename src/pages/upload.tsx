@@ -1,3 +1,4 @@
+// src/pages/upload.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
 import FileUploader from "../components/FileUploader";
@@ -16,6 +17,8 @@ export default function UploadPage() {
   const router = useRouter();
   const { isProcessing } = usePdfProcessing();
   const [error, setError] = useState<string | null>(null);
+  // コンポーネントのトップレベルでフックを呼び出す
+  const { addReceipts } = useReceiptContext();
 
   // 種類のオプション
   const typeOptions: ReceiptType[] = [
@@ -84,7 +87,8 @@ export default function UploadPage() {
 
       // アップロードしたデータをコンテキストに設定
       if (uploadedReceipts.length > 0) {
-        const { setReceipts } = useReceiptContext();
+        // 正しく取得したaddReceiptsメソッドを使用
+        addReceipts(uploadedReceipts);
 
         // 次のページに遷移
         router.push("/group");

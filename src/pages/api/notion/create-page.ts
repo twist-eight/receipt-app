@@ -1,3 +1,4 @@
+// src/pages/api/notion/create-page.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const NOTION_API_BASE_URL = "https://api.notion.com/v1";
@@ -36,7 +37,7 @@ export default async function handler(
       }),
     });
 
-    // デバッグ: レスポンスをテキストで取得して解析
+    // レスポンスをテキストで取得して解析
     const responseText = await response.text();
 
     try {
@@ -59,19 +60,6 @@ export default async function handler(
         raw: responseText,
       });
     }
-
-    const responseData = await response.json();
-
-    // Notionからのエラーレスポンスを処理
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: `Notion API error: ${responseData.message || "Unknown error"}`,
-        details: responseData,
-      });
-    }
-
-    // 成功したレスポンスを返す
-    return res.status(200).json(responseData);
   } catch (error) {
     console.error("Error creating page in Notion:", error);
     return res.status(500).json({
