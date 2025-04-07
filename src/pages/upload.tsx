@@ -2,18 +2,20 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import FileUploader from "../components/FileUploader";
 import { usePdfProcessing } from "../hooks/usePdfProcessing";
-import { ReceiptType } from "../types/receipt";
 import { useReceiptContext } from "../contexts/ReceiptContext";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { ReceiptType } from "../types/receipt";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedType, setSelectedType] = useState<ReceiptType | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
-  const { processFiles, isProcessing } = usePdfProcessing();
-  const { addReceipts } = useReceiptContext();
+  const {
+    processFiles,
+    isProcessing,
+    error: processingError,
+  } = usePdfProcessing();
+  const { setReceipts } = useReceiptContext();
   const [error, setError] = useState<string | null>(null);
 
   // 種類のオプション
@@ -43,31 +45,30 @@ export default function UploadPage() {
     }
 
     setError(null);
-    setIsUploading(true);
 
     try {
-      // ファイルを処理してPDFやサムネイル画像に変換
-      const processedReceipts = await processFiles(files, mergeMode);
+      // OCR実行を削除し、ファイルの処理のみを行う
+      const results = await processFiles(files, mergeMode);
 
-      // 種類を設定（選択されていれば）
-      if (selectedType) {
-        processedReceipts.forEach((receipt) => {
-          receipt.type = selectedType;
-        });
+      if (results.length > 0) {
+        // 選択した種類がある場合、すべての結果に適用
+        if (selectedType) {
+          results.forEach((result) => {
+            result.type = selectedType;
+          });
+        }
+
+        // ReceiptContext を通じて結果を保存
+        setReceipts(results);
+
+        // 処理が完了したらグループ化ページに遷移
+        router.push("/group");
+      } else {
+        setError("ファイルの処理結果が得られませんでした");
       }
-
-      // コンテキストにレシートを追加
-      await addReceipts(processedReceipts);
-
-      // 次のページに移動
-      router.push("/group");
     } catch (err) {
-      console.error("Upload error:", err);
-      setError(
-        err instanceof Error ? err.message : "ファイルの処理に失敗しました"
-      );
-    } finally {
-      setIsUploading(false);
+      console.error("Upload processing error:", err);
+      setError("ファイル処理中にエラーが発生しました");
     }
   };
 
@@ -75,6 +76,7 @@ export default function UploadPage() {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">領収書アップロード</h1>
 
+      {/* FileUploader コンポーネントを使用 */}
       <FileUploader
         onFilesChange={handleFilesChange}
         accept="image/*,application/pdf"
@@ -120,17 +122,10 @@ export default function UploadPage() {
         </p>
       </div>
 
-      {/* エラー表示 */}
-      {error && (
+      {/* エラー表示 -processFiles からのエラーとローカルのエラーを両方表示 */}
+      {(processingError || error) && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      )}
-
-      {/* アップロード中の表示 */}
-      {(isUploading || isProcessing) && (
-        <div className="mb-4 flex flex-col items-center">
-          <LoadingSpinner size="medium" color="blue" text="処理中..." />
+          {processingError || error}
         </div>
       )}
 
@@ -139,9 +134,9 @@ export default function UploadPage() {
           <button
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center"
             onClick={handleUpload}
-            disabled={isUploading || isProcessing || files.length === 0}
+            disabled={isProcessing || files.length === 0}
           >
-            {isUploading || isProcessing ? (
+            {isProcessing ? (
               <>
                 <svg
                   className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
@@ -166,10 +161,13 @@ export default function UploadPage() {
                 処理中...
               </>
             ) : (
-              "アップロード"
+              "実行（新規）"
             )}
           </button>
         </div>
+        <p className="text-sm text-gray-500 mt-2">
+          ※ 新規アップロードでは、以前のデータを全て置き換えます
+        </p>
       </div>
     </div>
   );

@@ -276,11 +276,6 @@ export default function OcrPage() {
                         : "h-60"
                     }`}
                   />
-                  {item.imageUrls.length > 1 && (
-                    <p className="text-xs text-center mt-1">
-                      {item.imageUrls.length}ページ
-                    </p>
-                  )}
                 </div>
               )}
             </div>
