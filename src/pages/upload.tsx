@@ -5,7 +5,6 @@ import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { ReceiptType } from "../types/receipt";
 import { uploadPdfAndCreateReceipt } from "../utils/receiptApi";
 import { useReceiptContext } from "../contexts/ReceiptContext";
-
 import { v4 as uuidv4 } from "uuid";
 
 export default function UploadPage() {
