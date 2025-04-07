@@ -9,7 +9,7 @@ export default function ClientsPage() {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [newClient, setNewClient] = useState<Partial<Client>>({
     name: "",
-    notionDatabaseId: "",
+    // notionDatabaseIdを削除
     documentTypes: [],
   });
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
@@ -31,16 +31,15 @@ export default function ClientsPage() {
 
   // 新規クライアント追加
   const handleAddClient = () => {
-    if (!newClient.name || !newClient.notionDatabaseId) {
-      setError("顧問先名とNotionデータベースIDは必須です");
+    if (!newClient.name) {
+      setError("顧問先名は必須です");
       return;
     }
 
     const client: Client = {
       id: uuidv4(),
       name: newClient.name,
-      notionDatabaseId: newClient.notionDatabaseId,
-      notionApiKey: newClient.notionApiKey,
+      // notionDatabaseIdとnotionApiKeyを削除
       documentTypes: newClient.documentTypes?.length
         ? newClient.documentTypes
         : baseDocumentTypes,
@@ -49,7 +48,7 @@ export default function ClientsPage() {
     addClient(client);
     setNewClient({
       name: "",
-      notionDatabaseId: "",
+      // リセット部分も修正
       documentTypes: [],
     });
     setIsAddingClient(false);
@@ -59,8 +58,8 @@ export default function ClientsPage() {
   // クライアント更新
   const handleUpdateClient = () => {
     if (!editingClient) return;
-    if (!editingClient.name || !editingClient.notionDatabaseId) {
-      setError("顧問先名とNotionデータベースIDは必須です");
+    if (!editingClient.name) {
+      setError("顧問先名は必須です");
       return;
     }
 
@@ -150,9 +149,6 @@ export default function ClientsPage() {
                     顧問先名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Notion DB ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ドキュメント種類
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -165,9 +161,6 @@ export default function ClientsPage() {
                   <tr key={client.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {client.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {client.notionDatabaseId.substring(0, 10)}...
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {client.documentTypes.length}種類
@@ -213,40 +206,6 @@ export default function ClientsPage() {
                 placeholder="例: 株式会社サンプル"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notion データベースID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={newClient.notionDatabaseId}
-                onChange={(e) =>
-                  setNewClient({
-                    ...newClient,
-                    notionDatabaseId: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="例: 8e9a0eb9c4074779a11a455d9924bf37"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notion API Key (省略可)
-              </label>
-              <input
-                type="text"
-                value={newClient.notionApiKey || ""}
-                onChange={(e) =>
-                  setNewClient({ ...newClient, notionApiKey: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="secret_xxxx..."
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                省略時はグローバル設定のAPI Keyが使用されます
-              </p>
-            </div>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setIsAddingClient(false)}
@@ -281,37 +240,6 @@ export default function ClientsPage() {
                   updateClient(editingClientId, { name: e.target.value })
                 }
                 className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notion データベースID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={editingClient.notionDatabaseId}
-                onChange={(e) =>
-                  updateClient(editingClientId, {
-                    notionDatabaseId: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notion API Key
-              </label>
-              <input
-                type="text"
-                value={editingClient.notionApiKey || ""}
-                onChange={(e) =>
-                  updateClient(editingClientId, {
-                    notionApiKey: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="secret_xxxx..."
               />
             </div>
 

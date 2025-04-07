@@ -5,8 +5,8 @@
 export interface Client {
   id: string;
   name: string;
-  notionDatabaseId: string; // 顧問先ごとのNotion DB ID
-  notionApiKey?: string; // 個別APIキー (省略時はグローバル設定を使用)
+  // notionDatabaseId: string; // 削除
+  // notionApiKey?: string;    // 削除
   documentTypes: DocumentTypeConfig[]; // ドキュメント種類の設定
 }
 

@@ -6,9 +6,9 @@ import { Client, DocumentTypeConfig } from "../types/client";
 interface ClientDatabaseRecord {
   id: string;
   name: string;
-  notion_database_id: string;
-  notion_api_key?: string;
-  document_types: DocumentTypeConfig[]; // any[]から具体的な型に変更
+  // notion_database_id: string; // 削除
+  // notion_api_key?: string;    // 削除
+  document_types: DocumentTypeConfig[];
   updated_at: string;
   created_at: string;
 }
@@ -33,8 +33,8 @@ export async function fetchClients(): Promise<{
     const clients = data.map((item) => ({
       id: item.id,
       name: item.name,
-      notionDatabaseId: item.notion_database_id || "",
-      notionApiKey: item.notion_api_key,
+      // notionDatabaseId: item.notion_database_id || "", // 削除
+      // notionApiKey: item.notion_api_key,               // 削除
       documentTypes: item.document_types || [],
     })) as Client[];
 
@@ -58,8 +58,8 @@ export async function createClient(
       .from("clients")
       .insert({
         name: clientData.name,
-        notion_database_id: clientData.notionDatabaseId,
-        notion_api_key: clientData.notionApiKey,
+        // notion_database_id: clientData.notionDatabaseId, // 削除
+        // notion_api_key: clientData.notionApiKey,         // 削除
         document_types: clientData.documentTypes || [],
       })
       .select()
@@ -73,8 +73,8 @@ export async function createClient(
     const client: Client = {
       id: data.id,
       name: data.name,
-      notionDatabaseId: data.notion_database_id || "",
-      notionApiKey: data.notion_api_key,
+      // notionDatabaseId: data.notion_database_id || "", // 削除
+      // notionApiKey: data.notion_api_key,               // 削除
       documentTypes: data.document_types || [],
     };
 
@@ -98,10 +98,7 @@ export async function updateClient(
     const updateData: Partial<ClientDatabaseRecord> = {};
 
     if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.notionDatabaseId !== undefined)
-      updateData.notion_database_id = updates.notionDatabaseId;
-    if (updates.notionApiKey !== undefined)
-      updateData.notion_api_key = updates.notionApiKey;
+
     if (updates.documentTypes !== undefined)
       updateData.document_types = updates.documentTypes;
     updateData.updated_at = new Date().toISOString();
@@ -121,43 +118,14 @@ export async function updateClient(
     const client: Client = {
       id: data.id,
       name: data.name,
-      notionDatabaseId: data.notion_database_id || "",
-      notionApiKey: data.notion_api_key,
+      // notionDatabaseId: data.notion_database_id || "", // 削除
+      // notionApiKey: data.notion_api_key,               // 削除
       documentTypes: data.document_types || [],
     };
 
     return { success: true, data: client };
   } catch (error) {
     console.error("Update client error:", error);
-    return {
-      success: false,
-      error:
-        error instanceof Error ? error.message : "未知のエラーが発生しました",
-    };
-  }
-}
-
-// 顧問先を削除する関数
-export async function deleteClient(
-  id: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    // 関連する領収書のclient_idをnullに設定
-    await supabase
-      .from("receipts")
-      .update({ client_id: null })
-      .eq("client_id", id);
-
-    // 顧問先を削除
-    const { error } = await supabase.from("clients").delete().eq("id", id);
-
-    if (error) {
-      throw error;
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Delete client error:", error);
     return {
       success: false,
       error:
