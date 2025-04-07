@@ -2,13 +2,11 @@ import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import Link from "next/link";
 import { ReceiptProvider } from "../contexts/ReceiptContext";
-import { ClientProvider } from "../contexts/ClientContext"; // 追加
+import { ClientProvider } from "../contexts/ClientContext";
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <ClientProvider>
-      {" "}
-      {/* 追加: ClientProviderでラップ */}
       <ReceiptProvider>
         <div className="min-h-screen bg-gray-50">
           <header className="bg-white shadow-md">
@@ -44,17 +42,10 @@ export default function App({ Component, pageProps }: AppProps) {
                 🧐 レビュー
               </Link>
               <Link
-                href="/export"
+                href="/register"
                 className="text-blue-600 hover:underline whitespace-nowrap"
               >
-                📄 Notion登録
-              </Link>
-              {/* 以下を追加 */}
-              <Link
-                href="/notion"
-                className="text-blue-600 hover:underline whitespace-nowrap"
-              >
-                📔 Notion連携
+                📄 Supabase登録
               </Link>
               <Link
                 href="/clients"

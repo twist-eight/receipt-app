@@ -1,24 +1,20 @@
-// src/pages/upload.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
 import FileUploader from "../components/FileUploader";
 import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { ReceiptType } from "../types/receipt";
-import { uploadPdfAndCreateReceipt } from "../utils/receiptApi";
 import { useReceiptContext } from "../contexts/ReceiptContext";
-import { v4 as uuidv4 } from "uuid";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [mergeMode, setMergeMode] = useState(false);
   const [selectedType, setSelectedType] = useState<ReceiptType | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const router = useRouter();
-  const { isProcessing } = usePdfProcessing();
-  const [error, setError] = useState<string | null>(null);
-  // コンポーネントのトップレベルでフックを呼び出す
+  const { processFiles, isProcessing } = usePdfProcessing();
   const { addReceipts } = useReceiptContext();
+  const [error, setError] = useState<string | null>(null);
 
   // 種類のオプション
   const typeOptions: ReceiptType[] = [
@@ -39,7 +35,7 @@ export default function UploadPage() {
     setSelectedType(selectedType === type ? null : type);
   };
 
-  // アップロード処理（Supabase版）
+  // アップロード処理
   const handleUpload = async () => {
     if (files.length === 0) {
       setError("ファイルをアップロードしてください");
@@ -48,57 +44,27 @@ export default function UploadPage() {
 
     setError(null);
     setIsUploading(true);
-    setUploadProgress(0);
 
     try {
-      // 複数のPDFを処理
-      const uploadedReceipts = [];
+      // ファイルを処理してPDFやサムネイル画像に変換
+      const processedReceipts = await processFiles(files, mergeMode);
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-
-        // Supabaseへのアップロード処理
-        const today = new Date().toISOString().split("T")[0];
-        const receiptData = {
-          id: uuidv4(),
-          imageUrls: [],
-          pdfUrl: "", // アップロード後に設定される
-          date: today,
-          updatedAt: today,
-          vendor: "",
-          amount: 0,
-          type: selectedType || "領収書",
-          memo: "",
-          tag: "",
-          status: "完了",
-        };
-
-        const result = await uploadPdfAndCreateReceipt(file, receiptData);
-
-        if (result.success && result.data) {
-          uploadedReceipts.push(result.data);
-        } else {
-          throw new Error(result.error || "アップロードに失敗しました");
-        }
-
-        // 進捗を更新
-        setUploadProgress(Math.round(((i + 1) / files.length) * 100));
+      // 種類を設定（選択されていれば）
+      if (selectedType) {
+        processedReceipts.forEach((receipt) => {
+          receipt.type = selectedType;
+        });
       }
 
-      // アップロードしたデータをコンテキストに設定
-      if (uploadedReceipts.length > 0) {
-        // 正しく取得したaddReceiptsメソッドを使用
-        addReceipts(uploadedReceipts);
+      // コンテキストにレシートを追加
+      await addReceipts(processedReceipts);
 
-        // 次のページに遷移
-        router.push("/group");
-      }
+      // 次のページに移動
+      router.push("/group");
     } catch (err) {
       console.error("Upload error:", err);
       setError(
-        err instanceof Error
-          ? err.message
-          : "ファイルのアップロードに失敗しました"
+        err instanceof Error ? err.message : "ファイルの処理に失敗しました"
       );
     } finally {
       setIsUploading(false);
@@ -161,18 +127,10 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* アップロード進捗表示 */}
-      {isUploading && (
-        <div className="mb-4">
-          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full"
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
-          </div>
-          <p className="text-sm text-gray-600">
-            アップロード中... {uploadProgress}%
-          </p>
+      {/* アップロード中の表示 */}
+      {(isUploading || isProcessing) && (
+        <div className="mb-4 flex flex-col items-center">
+          <LoadingSpinner size="medium" color="blue" text="処理中..." />
         </div>
       )}
 
@@ -208,13 +166,10 @@ export default function UploadPage() {
                 処理中...
               </>
             ) : (
-              "実行（新規）"
+              "アップロード"
             )}
           </button>
         </div>
-        <p className="text-sm text-gray-500 mt-2">
-          ※ Supabaseへの保存が有効になりました。PDFのみが保存されます。
-        </p>
       </div>
     </div>
   );
