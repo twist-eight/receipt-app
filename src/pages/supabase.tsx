@@ -1,17 +1,8 @@
 import { useState, useEffect } from "react";
-import { useClientContext } from "../contexts/ClientContext";
-import SupabaseSettings, {
-  SupabaseConfigSettings,
-} from "../components/SupabaseSettings";
 import { supabase } from "../utils/supabaseClient";
 
 export default function SupabasePage() {
-  const [globalSettings, setGlobalSettings] = useState<SupabaseConfigSettings>({
-    apiKey: "",
-  });
-  const [showGlobalSettings, setShowGlobalSettings] = useState(true);
   const [showProjectInfo, setShowProjectInfo] = useState(false);
-  const { clients, selectedClientId, setSelectedClientId } = useClientContext();
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -21,47 +12,66 @@ export default function SupabasePage() {
     version: string;
     timestamp: string;
   } | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    isConnected: boolean;
+    message: string;
+  }>({ isConnected: false, message: "接続確認中..." });
 
-  // 保存されているAPIキーを読み込む
+  // プロジェクト情報と接続ステータスの取得
   useEffect(() => {
-    const savedApiKey = localStorage.getItem("supabaseApiKey");
-    if (savedApiKey) {
-      setGlobalSettings((prev) => ({ ...prev, apiKey: savedApiKey }));
-    }
-
-    // プロジェクト情報の取得
-    const getProjectInfo = async () => {
+    const checkConnection = async () => {
       try {
-        const { data } = await supabase
-          .from("supabase_functions")
-          .select("version")
-          .limit(1)
-          .single();
-        setProjectInfo({
-          url: process.env.NEXT_PUBLIC_SUPABASE_URL || "設定済み",
-          version: data?.version || "バージョン不明",
-          timestamp: new Date().toLocaleString(),
-        });
+        // Supabaseの接続確認
+        const { error } = await supabase.auth.getSession();
+
+        if (error) {
+          setConnectionStatus({
+            isConnected: false,
+            message: `接続エラー: ${error.message}`,
+          });
+        } else {
+          setConnectionStatus({
+            isConnected: true,
+            message: "Supabase接続済み",
+          });
+        }
+
+        // プロジェクト情報の取得を試みる
+        try {
+          const { data } = await supabase
+            .from("supabase_functions")
+            .select("version")
+            .limit(1)
+            .single();
+          setProjectInfo({
+            url: process.env.NEXT_PUBLIC_SUPABASE_URL || "設定済み",
+            version: data?.version || "バージョン情報取得済み",
+            timestamp: new Date().toLocaleString(),
+          });
+        } catch {
+          // 特定のテーブルが存在しなくてもエラーにしない
+          setProjectInfo({
+            url: process.env.NEXT_PUBLIC_SUPABASE_URL || "設定済み",
+            version: "バージョン情報なし",
+            timestamp: new Date().toLocaleString(),
+          });
+        }
       } catch (error) {
-        console.error("プロジェクト情報の取得に失敗しました:", error);
-        setProjectInfo({
-          url: process.env.NEXT_PUBLIC_SUPABASE_URL || "設定済み",
-          version: "バージョン不明",
-          timestamp: new Date().toLocaleString(),
+        setConnectionStatus({
+          isConnected: false,
+          message: `接続確認中にエラーが発生しました: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+        setMessage({
+          type: "error",
+          text: "Supabase接続の確認に失敗しました",
         });
       }
     };
 
-    getProjectInfo();
+    checkConnection();
   }, []);
-
-  // グローバル設定の保存
-  const handleSaveGlobalSettings = (settings: SupabaseConfigSettings) => {
-    localStorage.setItem("supabaseApiKey", settings.apiKey);
-    setGlobalSettings(settings);
-    setMessage({ type: "success", text: "グローバル設定が保存されました" });
-    setTimeout(() => setMessage(null), 3000);
-  };
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -104,6 +114,43 @@ export default function SupabasePage() {
           </button>
         </div>
 
+        {/* 接続ステータス表示 */}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
+          <div className="flex items-center">
+            {connectionStatus.isConnected ? (
+              <span className="text-green-600 font-medium flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {connectionStatus.message}
+              </span>
+            ) : (
+              <span className="text-red-600 font-medium flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {connectionStatus.message}
+              </span>
+            )}
+          </div>
+        </div>
+
         {showProjectInfo && projectInfo && (
           <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
             <div className="grid grid-cols-2 gap-2">
@@ -118,13 +165,6 @@ export default function SupabasePage() {
             </div>
           </div>
         )}
-
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <p className="text-green-600 font-medium">✓ Supabase接続済み</p>
-          <p className="text-sm text-gray-600 mt-1">
-            環境変数で設定されたSupabase接続を使用しています。
-          </p>
-        </div>
       </div>
 
       <div className="mb-6 bg-white p-4 rounded-lg shadow-md">

@@ -9,7 +9,6 @@ export default function ExportPage() {
   const router = useRouter();
   const { receipts } = useReceiptContext();
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
-  const [globalSupabaseApiKey, setGlobalSupabaseApiKey] = useState("");
   const {
     syncReceiptsToSupabase,
     isSyncing,
@@ -31,14 +30,6 @@ export default function ExportPage() {
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
 
-  // APIキーの保存と読み取り
-  useEffect(() => {
-    const savedApiKey = localStorage.getItem("supabaseApiKey");
-    if (savedApiKey) {
-      setGlobalSupabaseApiKey(savedApiKey);
-    }
-  }, []);
-
   // 選択状態の初期化
   useEffect(() => {
     const initialSelection = receipts.reduce((acc, receipt) => {
@@ -55,12 +46,6 @@ export default function ExportPage() {
       setSelectedSubType(null);
     }
   }, [selectedClientId]);
-
-  // APIキーの保存
-  const handleSaveApiKey = () => {
-    localStorage.setItem("supabaseApiKey", globalSupabaseApiKey);
-    alert("API Keyが保存されました");
-  };
 
   // 全選択/全解除
   const handleSelectAllChange = (checked: boolean) => {
@@ -189,7 +174,7 @@ export default function ExportPage() {
         </div>
       )}
 
-      {/* Supabase API設定 */}
+      {/* Supabase接続情報 */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
         <h2 className="text-lg font-semibold mb-2">Supabase接続</h2>
         <p className="text-sm text-gray-600 mb-2">

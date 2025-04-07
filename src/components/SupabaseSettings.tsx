@@ -56,7 +56,7 @@ const SupabaseSettings: React.FC<SupabaseSettingsProps> = ({
 
     try {
       // Supabaseの接続テスト（現在のセッションを取得）
-      const { data, error } = await supabase.auth.getSession();
+      const { error } = await supabase.auth.getSession();
 
       if (!error) {
         setTestResult({
