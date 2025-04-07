@@ -2,20 +2,20 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../contexts/ClientContext";
-import { useNotionSync, NotionSyncOptions } from "../hooks/useNotionSync";
+import { useSupabaseSync, SupabaseSyncOptions } from "../hooks/useSupabaseSync";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function ExportPage() {
   const router = useRouter();
   const { receipts } = useReceiptContext();
   const { clients, selectedClientId, setSelectedClientId } = useClientContext();
-  const [globalNotionApiKey, setGlobalNotionApiKey] = useState("");
+  const [globalSupabaseApiKey, setGlobalSupabaseApiKey] = useState("");
   const {
-    syncReceiptsToNotion,
+    syncReceiptsToSupabase,
     isSyncing,
     error: syncError,
     syncStatus,
-  } = useNotionSync();
+  } = useSupabaseSync();
   const [error, setError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [receiptSelection, setReceiptSelection] = useState<{
@@ -33,9 +33,9 @@ export default function ExportPage() {
 
   // APIキーの保存と読み取り
   useEffect(() => {
-    const savedApiKey = localStorage.getItem("notionApiKey");
+    const savedApiKey = localStorage.getItem("supabaseApiKey");
     if (savedApiKey) {
-      setGlobalNotionApiKey(savedApiKey);
+      setGlobalSupabaseApiKey(savedApiKey);
     }
   }, []);
 
@@ -58,7 +58,7 @@ export default function ExportPage() {
 
   // APIキーの保存
   const handleSaveApiKey = () => {
-    localStorage.setItem("notionApiKey", globalNotionApiKey);
+    localStorage.setItem("supabaseApiKey", globalSupabaseApiKey);
     alert("API Keyが保存されました");
   };
 
@@ -109,13 +109,13 @@ export default function ExportPage() {
     setSelectedSubType(null); // サブタイプをリセット
   };
 
-  // Notionにエクスポート
-  const handleExportToNotion = async () => {
+  // Supabaseにエクスポート
+  const handleExportToSupabase = async () => {
     setIsConfirmDialogOpen(false);
     setError(null);
 
     try {
-      // 選択された顧問先とAPIキーの確認
+      // 選択された顧問先の確認
       if (!selectedClientId) {
         throw new Error("顧問先を選択してください");
       }
@@ -123,12 +123,6 @@ export default function ExportPage() {
       const client = clients.find((c) => c.id === selectedClientId);
       if (!client) {
         throw new Error("選択された顧問先が見つかりません");
-      }
-
-      // APIキーの取得 (個別設定 > グローバル設定)
-      const apiKey = client.notionApiKey || globalNotionApiKey;
-      if (!apiKey) {
-        throw new Error("Notion API Keyが設定されていません");
       }
 
       // 選択されたレシートを抽出
@@ -144,18 +138,17 @@ export default function ExportPage() {
         selectedReceiptIds.includes(receipt.id)
       );
 
-      // Notionのオプションを設定
-      const syncOptions: NotionSyncOptions = {
+      // Supabaseのオプションを設定
+      const syncOptions: SupabaseSyncOptions = {
         transferType: selectedTransferType,
         subType: selectedSubType || undefined,
       };
 
-      // Notionにエクスポート
-      const result = await syncReceiptsToNotion(
+      // Supabaseにエクスポート
+      const result = await syncReceiptsToSupabase(
         selectedReceipts,
         client,
-        syncOptions,
-        apiKey
+        syncOptions
       );
 
       // 結果をユーザーに表示
@@ -179,7 +172,7 @@ export default function ExportPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-xl font-bold mb-4">Notionエクスポート</h1>
+      <h1 className="text-xl font-bold mb-4">Supabaseエクスポート</h1>
 
       {(error || syncError) && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
@@ -196,26 +189,11 @@ export default function ExportPage() {
         </div>
       )}
 
-      {/* Notion API設定 */}
+      {/* Supabase API設定 */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
-        <h2 className="text-lg font-semibold mb-2">Notion API設定</h2>
-        <div className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={globalNotionApiKey}
-            onChange={(e) => setGlobalNotionApiKey(e.target.value)}
-            placeholder="Notion API Key (共通設定)"
-            className="flex-1 px-3 py-2 border rounded"
-          />
-          <button
-            onClick={handleSaveApiKey}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            保存
-          </button>
-        </div>
-        <p className="text-sm text-gray-500">
-          ※ 顧問先個別のAPI Keyが設定されている場合はそちらが優先されます
+        <h2 className="text-lg font-semibold mb-2">Supabase接続</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          環境変数で設定されたSupabase接続を使用します。設定済みのプロジェクトで動作します。
         </p>
       </div>
 
@@ -329,13 +307,13 @@ export default function ExportPage() {
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
-          title="Notionへエクスポート"
+          title="Supabaseへエクスポート"
           message={`選択した${
             Object.values(receiptSelection).filter(Boolean).length
-          }件のレシートをNotionデータベースにエクスポートします。この操作は取り消せません。`}
+          }件のレシートをSupabaseデータベースにエクスポートします。この操作は取り消せません。`}
           confirmLabel="エクスポート"
           cancelLabel="キャンセル"
-          onConfirm={handleExportToNotion}
+          onConfirm={handleExportToSupabase}
           onCancel={() => setIsConfirmDialogOpen(false)}
           extraContent={
             <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded">
@@ -498,7 +476,7 @@ export default function ExportPage() {
                 {syncStatus.success + syncStatus.failed}
               </span>
             ) : (
-              "Notionに登録"
+              "Supabaseに登録"
             )}
           </button>
         </div>

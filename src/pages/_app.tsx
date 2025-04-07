@@ -48,10 +48,22 @@ export default function App({ Component, pageProps }: AppProps) {
                 📄 Supabase登録
               </Link>
               <Link
+                href="/export"
+                className="text-blue-600 hover:underline whitespace-nowrap"
+              >
+                📊 Supabaseエクスポート
+              </Link>
+              <Link
                 href="/clients"
                 className="text-blue-600 hover:underline whitespace-nowrap"
               >
                 👥 顧問先設定
+              </Link>
+              <Link
+                href="/supabase"
+                className="text-blue-600 hover:underline whitespace-nowrap"
+              >
+                ⚙️ Supabase設定
               </Link>
             </nav>
           </header>
