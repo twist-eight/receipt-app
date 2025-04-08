@@ -1,5 +1,5 @@
+// src/pages/review.tsx
 import { useState } from "react";
-import Link from "next/link";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useReloadWarning } from "../hooks/useReloadWarning";
 import ReceiptCard from "../components/ReceiptCard";
@@ -8,10 +8,17 @@ import GroupDialog from "../components/GroupDialog";
 import { ReceiptItem } from "../types/receipt";
 import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
+import Link from "next/link";
 
 export default function ReviewPage() {
-  const { receipts, updateReceipt, removeReceipt, clearReceipts, addReceipt } =
-    useReceiptContext();
+  const {
+    receipts,
+    // setReceipts を削除またはリネーム
+    updateReceipt,
+    removeReceipt,
+    clearReceipts,
+    addReceipt,
+  } = useReceiptContext();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
     useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -199,7 +206,55 @@ export default function ReviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-xl font-bold mb-4">OCR結果の確認と編集</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-bold">OCR結果の確認と編集</h1>
+
+        <div className="flex gap-2">
+          {receipts.length > 0 && (
+            <>
+              {selectedItemIds.length >= 2 && (
+                <button
+                  onClick={() => setIsGroupDialogOpen(true)}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center text-sm"
+                  aria-label="選択したアイテムをグループ化"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-1"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                  </svg>
+                  {selectedItemIds.length}件をグループ化
+                </button>
+              )}
+
+              <button
+                onClick={() => setIsConfirmDialogOpen(true)}
+                className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 flex items-center text-sm"
+                aria-label="全データをクリア"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 mr-1"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                全データをクリア
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
@@ -214,73 +269,31 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* アクションボタン */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {receipts.length > 0 && (
-          <>
+      {/* 選択情報と制御エリア */}
+      {receipts.length > 0 && (
+        <div className="bg-gray-50 p-3 rounded-lg mb-4 flex justify-between items-center">
+          <div>
+            <span className="text-sm font-medium">
+              {selectedItemIds.length} / {receipts.length} アイテムを選択中
+            </span>
+          </div>
+          <div>
             <button
-              onClick={() => setIsConfirmDialogOpen(true)}
-              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center"
-              aria-label="全データをクリア"
+              onClick={() =>
+                setSelectedItemIds(
+                  selectedItemIds.length === receipts.length
+                    ? []
+                    : receipts.map((r) => r.id)
+                )
+              }
+              className="text-sm text-blue-600 hover:underline"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              全データをクリア
+              {selectedItemIds.length === receipts.length
+                ? "全て選択解除"
+                : "全て選択"}
             </button>
-
-            {selectedItemIds.length >= 2 && (
-              <button
-                onClick={() => setIsGroupDialogOpen(true)}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
-                aria-label="選択したアイテムをグループ化"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                </svg>
-                選択したアイテムをグループ化 ({selectedItemIds.length})
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* 全削除確認ダイアログ */}
-      {isConfirmDialogOpen && (
-        <ConfirmDialog
-          title="全データを削除しますか？"
-          message="すべてのレシートデータが完全に削除されます。この操作は元に戻せません。"
-          confirmLabel="削除する"
-          cancelLabel="キャンセル"
-          onConfirm={handleClearAllData}
-          onCancel={() => setIsConfirmDialogOpen(false)}
-          isDestructive={true}
-        />
-      )}
-
-      {/* グループ化ダイアログ */}
-      {isGroupDialogOpen && (
-        <GroupDialog
-          selectedCount={selectedItemIds.length}
-          onConfirm={handleGroupConfirm}
-          onCancel={() => setIsGroupDialogOpen(false)}
-        />
+          </div>
+        </div>
       )}
 
       {receipts.length === 0 && (
@@ -297,7 +310,8 @@ export default function ReviewPage() {
         </div>
       )}
 
-      <div className="space-y-6">
+      {/* レシートカードのグリッドレイアウトを改善 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {receipts.map((receipt) => (
           <div key={receipt.id} className="relative">
             <button
@@ -332,10 +346,33 @@ export default function ReviewPage() {
                 toggleItemSelection(receipt.id, isSelected)
               }
               showCheckbox={true}
+              onDelete={() => handleDeleteItem(receipt.id)}
             />
           </div>
         ))}
       </div>
+
+      {/* 確認ダイアログ */}
+      {isConfirmDialogOpen && (
+        <ConfirmDialog
+          title="全データを削除しますか？"
+          message="すべてのレシートデータが完全に削除されます。この操作は元に戻せません。"
+          confirmLabel="削除する"
+          cancelLabel="キャンセル"
+          onConfirm={handleClearAllData}
+          onCancel={() => setIsConfirmDialogOpen(false)}
+          isDestructive={true}
+        />
+      )}
+
+      {/* グループ化ダイアログ */}
+      {isGroupDialogOpen && (
+        <GroupDialog
+          selectedCount={selectedItemIds.length}
+          onConfirm={handleGroupConfirm}
+          onCancel={() => setIsGroupDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }

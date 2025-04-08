@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
+import { useClientContext } from "../contexts/ClientContext";
 import ImageCarousel from "../components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ReceiptType } from "../types/receipt";
@@ -9,15 +10,23 @@ import { ReceiptType } from "../types/receipt";
 export default function OcrPage() {
   const router = useRouter();
   const { receipts, updateReceipt } = useReceiptContext();
+  const { selectedClientId, clients } = useClientContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
+  const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
 
   // 初期化フラグを追加
   const initializedRef = useRef(false);
+
+  // 選択中の顧問先情報
+  const selectedClient = selectedClientId
+    ? clients.find((c) => c.id === selectedClientId)
+    : null;
 
   // カードサイズのオプションと状態
   const sizeOptions = [
@@ -41,6 +50,14 @@ export default function OcrPage() {
     { value: null, label: "すべて" },
     ...typeOptions.map((type) => ({ value: type, label: type })),
   ];
+
+  // 選択したタイプのサブタイプを取得する関数
+  const getSubTypesForSelectedType = (type: string | null) => {
+    if (!selectedClient || !type) return [];
+
+    const docType = selectedClient.documentTypes.find((dt) => dt.type === type);
+    return docType ? docType.subTypes : [];
+  };
 
   // 初期化時「だけ」に全てのアイテムを選択状態にする
   useEffect(() => {
@@ -78,8 +95,22 @@ export default function OcrPage() {
     e.stopPropagation();
     e.preventDefault();
 
+    // サブタイプをリセット
+    setSelectedSubType(null);
+    setSelectedDocType(type);
+
     // 種類のみを更新し、選択状態には影響しない
     updateReceipt(id, { type });
+  };
+
+  // サブタイプの選択処理
+  const handleSubTypeSelect = (subType: string) => {
+    setSelectedSubType(selectedSubType === subType ? null : subType);
+
+    // 選択されているすべてのアイテムにサブタイプを適用
+    selectedIds.forEach((id) => {
+      updateReceipt(id, { subType });
+    });
   };
 
   // OCR実行の処理
@@ -208,6 +239,33 @@ export default function OcrPage() {
         </span>
       </div>
 
+      {/* サブタイプ一括選択セクション */}
+      {selectedIds.length > 0 &&
+        selectedDocType &&
+        getSubTypesForSelectedType(selectedDocType).length > 0 && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm font-medium mb-2">
+              選択中の{selectedIds.length}件に一括でサブタイプを設定:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {getSubTypesForSelectedType(selectedDocType).map((subType) => (
+                <button
+                  key={subType}
+                  onClick={() => handleSubTypeSelect(subType)}
+                  className={`px-3 py-1 text-sm rounded ${
+                    selectedSubType === subType
+                      ? "bg-green-500 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                  }`}
+                  type="button"
+                >
+                  {subType}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
@@ -302,6 +360,41 @@ export default function OcrPage() {
                   </button>
                 ))}
               </div>
+
+              {/* サブタイプ選択 - 選択した種類にサブタイプがある場合のみ表示 */}
+              {item.type &&
+                getSubTypesForSelectedType(item.type).length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">
+                      サブタイプを選択：
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {getSubTypesForSelectedType(item.type).map((subType) => (
+                        <button
+                          key={subType}
+                          onClick={() => updateReceipt(item.id, { subType })}
+                          className={`px-2 py-1 text-xs rounded ${
+                            item.subType === subType
+                              ? "bg-green-500 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                          type="button"
+                        >
+                          {subType}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* 選択されているサブタイプの表示 */}
+              {item.subType && (
+                <div className="mt-2">
+                  <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                    サブタイプ: {item.subType}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}
