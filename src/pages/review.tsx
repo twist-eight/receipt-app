@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useReloadWarning } from "../hooks/useReloadWarning";
 import ReceiptCard from "../components/ReceiptCard";
@@ -9,14 +10,8 @@ import { usePdfProcessing } from "../hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
 
 export default function ReviewPage() {
-  const {
-    receipts,
-    setReceipts,
-    updateReceipt,
-    removeReceipt,
-    clearReceipts,
-    addReceipt,
-  } = useReceiptContext();
+  const { receipts, updateReceipt, removeReceipt, clearReceipts, addReceipt } =
+    useReceiptContext();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
     useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,25 +197,6 @@ export default function ReviewPage() {
     }
   };
 
-  const loadTestData = () => {
-    const testData: ReceiptItem[] = [
-      {
-        id: "test001",
-        imageUrls: ["/sample.jpg"], // 配列に変更
-        pdfUrl: "/sample.pdf",
-        date: "2025-04-01",
-        updatedAt: new Date().toISOString().split("T")[0], // 今日の日付を追加
-        vendor: "テスト商店",
-        amount: 1234,
-        type: "領収書",
-        memo: "テスト用メモ",
-        tag: "交際費",
-        status: "完了",
-      },
-    ];
-    setReceipts(testData);
-  };
-
   return (
     <div className="max-w-5xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">OCR結果の確認と編集</h1>
@@ -308,16 +284,16 @@ export default function ReviewPage() {
       )}
 
       {receipts.length === 0 && (
-        <div className="mb-6">
+        <div className="mb-6 p-8 bg-gray-100 rounded-lg text-center">
           <p className="mb-2">
-            データがありません。テストデータを読み込みますか？
+            データがありません。アップロードページからドキュメントを追加してください。
           </p>
-          <button
-            onClick={loadTestData}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          <Link
+            href="/upload"
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 inline-block"
           >
-            テストモードを開始
-          </button>
+            アップロードページへ
+          </Link>
         </div>
       )}
 
