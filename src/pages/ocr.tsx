@@ -17,8 +17,6 @@ export default function OcrPage() {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
-  const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
 
   // 初期化フラグを追加
   const initializedRef = useRef(false);
@@ -85,7 +83,7 @@ export default function OcrPage() {
     }
   };
 
-  // 種類ボタンのクリックハンドラ - データ更新のみを行い、選択状態には触れない
+  // 種類ボタンのクリックハンドラ - 種類変更時にサブタイプをリセットするように
   const handleTypeButtonClick = (
     e: React.MouseEvent,
     id: string,
@@ -95,22 +93,32 @@ export default function OcrPage() {
     e.stopPropagation();
     e.preventDefault();
 
-    // サブタイプをリセット
-    setSelectedSubType(null);
-    setSelectedDocType(type);
-
-    // 種類のみを更新し、選択状態には影響しない
-    updateReceipt(id, { type });
+    // 種類が変わった場合は、サブタイプをリセット
+    const receipt = receipts.find((item) => item.id === id);
+    if (receipt && receipt.type !== type) {
+      updateReceipt(id, { type, subType: undefined });
+    } else {
+      updateReceipt(id, { type });
+    }
   };
 
-  // サブタイプの選択処理
-  const handleSubTypeSelect = (subType: string) => {
-    setSelectedSubType(selectedSubType === subType ? null : subType);
+  // サブタイプボタンのクリックハンドラ - トグル動作ができるように
+  const handleSubTypeButtonClick = (
+    e: React.MouseEvent,
+    id: string,
+    subType: string
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
 
-    // 選択されているすべてのアイテムにサブタイプを適用
-    selectedIds.forEach((id) => {
+    const receipt = receipts.find((item) => item.id === id);
+    if (receipt && receipt.subType === subType) {
+      // 同じサブタイプがすでに選択されている場合は解除
+      updateReceipt(id, { subType: undefined });
+    } else {
+      // それ以外の場合は新しいサブタイプを設定
       updateReceipt(id, { subType });
-    });
+    }
   };
 
   // OCR実行の処理
@@ -239,33 +247,6 @@ export default function OcrPage() {
         </span>
       </div>
 
-      {/* サブタイプ一括選択セクション */}
-      {selectedIds.length > 0 &&
-        selectedDocType &&
-        getSubTypesForSelectedType(selectedDocType).length > 0 && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm font-medium mb-2">
-              選択中の{selectedIds.length}件に一括でサブタイプを設定:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {getSubTypesForSelectedType(selectedDocType).map((subType) => (
-                <button
-                  key={subType}
-                  onClick={() => handleSubTypeSelect(subType)}
-                  className={`px-3 py-1 text-sm rounded ${
-                    selectedSubType === subType
-                      ? "bg-green-500 text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
-                  }`}
-                  type="button"
-                >
-                  {subType}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
@@ -372,7 +353,9 @@ export default function OcrPage() {
                       {getSubTypesForSelectedType(item.type).map((subType) => (
                         <button
                           key={subType}
-                          onClick={() => updateReceipt(item.id, { subType })}
+                          onClick={(e) =>
+                            handleSubTypeButtonClick(e, item.id, subType)
+                          }
                           className={`px-2 py-1 text-xs rounded ${
                             item.subType === subType
                               ? "bg-green-500 text-white"

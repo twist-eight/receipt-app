@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../contexts/ClientContext";
 import { useSupabaseSync, SupabaseSyncOptions } from "../hooks/useSupabaseSync";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function ExportPage() {
-  const router = useRouter();
   const { receipts } = useReceiptContext();
-  const { clients, selectedClientId, setSelectedClientId } = useClientContext();
+  const { clients, selectedClientId } = useClientContext();
   const {
     syncReceiptsToSupabase,
     isSyncing,
@@ -22,14 +20,6 @@ export default function ExportPage() {
   }>({});
   const [selectAll, setSelectAll] = useState(false);
 
-  // 授受区分のオプション
-  const transferTypeOptions = ["受取", "渡し"];
-  const [selectedTransferType, setSelectedTransferType] = useState("受取");
-
-  // サブタイプ選択
-  const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
-  const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
-
   // 選択状態の初期化
   useEffect(() => {
     const initialSelection = receipts.reduce((acc, receipt) => {
@@ -38,14 +28,6 @@ export default function ExportPage() {
     }, {} as { [id: string]: boolean });
     setReceiptSelection(initialSelection);
   }, [receipts]);
-
-  // 選択中の顧問先が変更されたらドキュメント種類もリセット
-  useEffect(() => {
-    if (selectedClientId) {
-      setSelectedDocType(null);
-      setSelectedSubType(null);
-    }
-  }, [selectedClientId]);
 
   // 全選択/全解除
   const handleSelectAllChange = (checked: boolean) => {
@@ -71,27 +53,6 @@ export default function ExportPage() {
       }).every((selected) => selected);
       setSelectAll(allSelected);
     }
-  };
-
-  // 現在の顧問先のドキュメントタイプを取得
-  const getCurrentClientDocTypes = () => {
-    if (!selectedClientId) return [];
-    const client = clients.find((c) => c.id === selectedClientId);
-    return client ? client.documentTypes : [];
-  };
-
-  // 選択されたドキュメントタイプのサブタイプを取得
-  const getSubTypesForSelectedDocType = () => {
-    if (!selectedDocType) return [];
-    const docTypes = getCurrentClientDocTypes();
-    const docType = docTypes.find((dt) => dt.type === selectedDocType);
-    return docType ? docType.subTypes : [];
-  };
-
-  // ドキュメント種類の選択時
-  const handleDocTypeChange = (type: string) => {
-    setSelectedDocType(type);
-    setSelectedSubType(null); // サブタイプをリセット
   };
 
   // Supabaseにエクスポート
@@ -185,113 +146,6 @@ export default function ExportPage() {
         <p className="text-sm text-gray-600 mb-2">
           環境変数で設定されたSupabase接続を使用します。設定済みのプロジェクトで動作します。
         </p>
-      </div>
-
-      {/* 顧問先選択 */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
-        <h2 className="text-lg font-semibold mb-2">顧問先選択</h2>
-        {clients.length === 0 ? (
-          <div>
-            <p className="text-gray-500 mb-2">顧問先が登録されていません</p>
-            <button
-              onClick={() => router.push("/clients")}
-              className="text-blue-600 hover:underline"
-            >
-              顧問先設定ページで登録する
-            </button>
-          </div>
-        ) : (
-          <select
-            value={selectedClientId || ""}
-            onChange={(e) => setSelectedClientId(e.target.value || null)}
-            className="w-full px-3 py-2 border rounded"
-          >
-            <option value="">顧問先を選択してください</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* 授受区分とドキュメント設定 */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
-        <h2 className="text-lg font-semibold mb-2">ドキュメント設定</h2>
-
-        {/* 授受区分 */}
-        <div className="mb-4">
-          <h3 className="text-sm font-medium mb-2">授受区分</h3>
-          <div className="flex gap-2">
-            {transferTypeOptions.map((type) => (
-              <button
-                key={type}
-                onClick={() => setSelectedTransferType(type)}
-                className={`px-4 py-2 rounded ${
-                  selectedTransferType === type
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ドキュメント種類選択 */}
-        {selectedClientId && (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium mb-2">
-              ドキュメント種類{" "}
-              <span className="text-gray-500 text-xs">(任意)</span>
-            </h3>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {getCurrentClientDocTypes().map((docType) => (
-                <button
-                  key={docType.type}
-                  onClick={() => handleDocTypeChange(docType.type)}
-                  className={`px-4 py-2 rounded text-sm ${
-                    selectedDocType === docType.type
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {docType.type}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* サブタイプ選択 */}
-        {selectedDocType && getSubTypesForSelectedDocType().length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium mb-2">
-              サブタイプ <span className="text-gray-500 text-xs">(任意)</span>
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {getSubTypesForSelectedDocType().map((subType) => (
-                <button
-                  key={subType}
-                  onClick={() =>
-                    setSelectedSubType(
-                      subType === selectedSubType ? null : subType
-                    )
-                  }
-                  className={`px-3 py-1 rounded text-sm ${
-                    selectedSubType === subType
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {subType}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 確認ダイアログ */}
