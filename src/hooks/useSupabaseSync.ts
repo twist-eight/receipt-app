@@ -1,7 +1,14 @@
+// src/hooks/useSupabaseSync.ts
 import { useState } from "react";
 import { ReceiptItem } from "../types/receipt";
 import { Client } from "../types/client";
 import { supabase } from "../utils/supabaseClient";
+import * as pdfjsLib from "pdfjs-dist";
+
+// PDFワーカーの設定
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 // SupabaseSyncOptionsの定義
 export interface SupabaseSyncOptions {
@@ -41,25 +48,45 @@ export function useSupabaseSync() {
           // レシートをPDFとしてSupabaseストレージに保存
           // （実際のPDFファイルがあれば）
           let storagePath = "";
+          let fileSize = 0;
+          let pageCount = 1; // デフォルトは1ページ
+
           if (receipt.pdfUrl && receipt.pdfUrl.startsWith("blob:")) {
-            const pdfResponse = await fetch(receipt.pdfUrl);
-            const pdfBlob = await pdfResponse.blob();
-            const fileName = `${receipt.id}.pdf`;
-            const filePath = `receipts/${fileName}`;
+            try {
+              const pdfResponse = await fetch(receipt.pdfUrl);
+              const pdfBlob = await pdfResponse.blob();
+              fileSize = pdfBlob.size; // ファイルサイズを記録
 
-            const { error: uploadError } = await supabase.storage
-              .from("receipts")
-              .upload(filePath, pdfBlob);
+              // PDFのページ数を取得
+              const arrayBuffer = await pdfBlob.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument(
+                new Uint8Array(arrayBuffer)
+              ).promise;
+              pageCount = pdf.numPages;
 
-            if (uploadError) {
-              console.error("PDF upload error:", uploadError);
-            } else {
-              storagePath = filePath;
+              // ファイル名をより構造化: クライアントID/日付_レシートID.pdf
+              const dateStr = receipt.date
+                ? receipt.date.replace(/-/g, "")
+                : "nodate";
+              const fileName = `${dateStr}_${receipt.id}.pdf`;
+              const filePath = `clients/${client.id}/${fileName}`;
+
+              const { error: uploadError } = await supabase.storage
+                .from("receipts")
+                .upload(filePath, pdfBlob);
+
+              if (uploadError) {
+                console.error("PDF upload error:", uploadError);
+              } else {
+                storagePath = filePath;
+              }
+            } catch (err) {
+              console.error("PDF processing error:", err);
             }
           }
 
           // レシートデータをSupabaseデータベースに保存
-          const { error: insertError } = await supabase
+          const { data: receiptData, error: insertError } = await supabase
             .from("receipts")
             .upsert({
               id: receipt.id,
@@ -68,7 +95,9 @@ export function useSupabaseSync() {
               amount: receipt.amount || 0,
               date: receipt.date || null,
               pdf_path: storagePath || null,
-              pdf_name: `${receipt.vendor || "receipt"}.pdf`,
+              pdf_name: receipt.vendor
+                ? `${receipt.vendor}_${receipt.date || "nodate"}.pdf`
+                : `receipt_${receipt.id}.pdf`,
               type: receipt.type || "領収書",
               memo: receipt.memo || "",
               tag: receipt.tag || "",
@@ -76,10 +105,34 @@ export function useSupabaseSync() {
               transfer_type: options.transferType,
               sub_type: options.subType || null,
               updated_at: new Date().toISOString(),
-            });
+            })
+            .select()
+            .single();
 
           if (insertError) {
             throw insertError;
+          }
+
+          // PDFメタデータをpdf_metadataテーブルに保存
+          if (receiptData && storagePath) {
+            const originalFilename = receipt.vendor
+              ? `${receipt.vendor}_${receipt.date || "nodate"}.pdf`
+              : `receipt_${receipt.id}.pdf`;
+
+            const { error: metadataError } = await supabase
+              .from("pdf_metadata")
+              .upsert({
+                id: receipt.id, // receiptと同じIDを使用
+                receipt_id: receipt.id,
+                original_filename: originalFilename,
+                file_size: fileSize,
+                page_count: pageCount,
+                created_at: new Date().toISOString(),
+              });
+
+            if (metadataError) {
+              console.error("PDF metadata insertion error:", metadataError);
+            }
           }
 
           successCount++;
