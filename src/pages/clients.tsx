@@ -39,7 +39,6 @@ export default function ClientsPage() {
     const client: Client = {
       id: uuidv4(),
       name: newClient.name,
-      // notionDatabaseIdとnotionApiKeyを削除
       documentTypes: newClient.documentTypes?.length
         ? newClient.documentTypes
         : baseDocumentTypes,
