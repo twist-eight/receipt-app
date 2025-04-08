@@ -86,7 +86,7 @@ export default function Home() {
         </li>
         <li>
           <Link href="/export" className="text-blue-600 underline">
-            CSV出力ページへ
+            データベース登録ページへ
           </Link>
         </li>
       </ul>

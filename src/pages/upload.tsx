@@ -140,31 +140,6 @@ export default function UploadPage() {
           複数ページPDFを1件として保存（明細書など）
         </label>
       </div>
-
-      {/* 種類選択ボタン */}
-      <div className="mb-6">
-        <p className="text-sm font-medium mb-2">ドキュメント種類（任意）：</p>
-        <div className="flex flex-wrap gap-2">
-          {typeOptions.map((type) => (
-            <button
-              key={type}
-              onClick={() => handleTypeSelect(type)}
-              className={`px-3 py-2 rounded ${
-                selectedType === type
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-              type="button"
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          選択するとすべてのファイルに適用されます。選択しない場合はデフォルト（領収書）が適用されます。
-        </p>
-      </div>
-
       {/* 授受区分選択ボタン（追加） */}
       <div className="mb-6">
         <p className="text-sm font-medium mb-2">授受区分：</p>
@@ -186,6 +161,29 @@ export default function UploadPage() {
         </div>
         <p className="text-xs text-gray-500 mt-1">
           すべてのファイルに適用される授受区分を選択してください。
+        </p>
+      </div>
+      {/* 種類選択ボタン */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-2">ドキュメント種類（任意）：</p>
+        <div className="flex flex-wrap gap-2">
+          {typeOptions.map((type) => (
+            <button
+              key={type}
+              onClick={() => handleTypeSelect(type)}
+              className={`px-3 py-2 rounded ${
+                selectedType === type
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              type="button"
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          選択するとすべてのファイルに適用されます。選択しない場合はデフォルト（領収書）が適用されます。
         </p>
       </div>
 
