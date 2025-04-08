@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../contexts/ClientContext";
 import { useSupabaseSync, SupabaseSyncOptions } from "../hooks/useSupabaseSync";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Link from "next/link";
 
 export default function ExportPage() {
   const { receipts } = useReceiptContext();
@@ -13,6 +14,7 @@ export default function ExportPage() {
     error: syncError,
     syncStatus,
   } = useSupabaseSync();
+
   const [error, setError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [receiptSelection, setReceiptSelection] = useState<{
@@ -20,20 +22,32 @@ export default function ExportPage() {
   }>({});
   const [selectAll, setSelectAll] = useState(false);
 
-  // 選択状態の初期化
-  useEffect(() => {
-    const initialSelection = receipts.reduce((acc, receipt) => {
-      acc[receipt.id] = false;
-      return acc;
-    }, {} as { [id: string]: boolean });
-    setReceiptSelection(initialSelection);
+  // レビューページで確認済みのアイテムのみを表示するようにフィルタリング
+  // useMemoを使って不要な再計算を防止
+  const confirmedReceipts = useMemo(() => {
+    return receipts.filter((receipt) => receipt.status === "完了");
   }, [receipts]);
+
+  // 選択状態の初期化 - 依存配列を確認し、receiptsのIDだけに依存するように修正
+  useEffect(() => {
+    const receiptIds = confirmedReceipts.map((receipt) => receipt.id);
+    // 現在の選択状態を保持しつつ、新しいIDのみ追加
+    setReceiptSelection((prev) => {
+      const newSelection = { ...prev };
+      receiptIds.forEach((id) => {
+        if (newSelection[id] === undefined) {
+          newSelection[id] = false;
+        }
+      });
+      return newSelection;
+    });
+  }, [confirmedReceipts]);
 
   // 全選択/全解除
   const handleSelectAllChange = (checked: boolean) => {
     setSelectAll(checked);
     const newSelection = { ...receiptSelection };
-    receipts.forEach((receipt) => {
+    confirmedReceipts.forEach((receipt) => {
       newSelection[receipt.id] = checked;
     });
     setReceiptSelection(newSelection);
@@ -47,10 +61,9 @@ export default function ExportPage() {
     if (!checked) {
       setSelectAll(false);
     } else {
-      const allSelected = Object.values({
-        ...receiptSelection,
-        [id]: checked,
-      }).every((selected) => selected);
+      const allSelected = confirmedReceipts.every(
+        (receipt) => receiptSelection[receipt.id] || receipt.id === id
+      );
       setSelectAll(allSelected);
     }
   };
@@ -80,7 +93,7 @@ export default function ExportPage() {
         throw new Error("エクスポートするアイテムを選択してください");
       }
 
-      const selectedReceipts = receipts.filter((receipt) =>
+      const selectedReceipts = confirmedReceipts.filter((receipt) =>
         selectedReceiptIds.includes(receipt.id)
       );
 
@@ -121,6 +134,9 @@ export default function ExportPage() {
     }
   };
 
+  // 選択済みアイテム数を計算
+  const selectedCount = Object.values(receiptSelection).filter(Boolean).length;
+
   return (
     <div className="max-w-5xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">Supabaseエクスポート</h1>
@@ -140,21 +156,30 @@ export default function ExportPage() {
         </div>
       )}
 
-      {/* Supabase接続情報 */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
-        <h2 className="text-lg font-semibold mb-2">Supabase接続</h2>
-        <p className="text-sm text-gray-600 mb-2">
-          環境変数で設定されたSupabase接続を使用します。設定済みのプロジェクトで動作します。
-        </p>
-      </div>
+      {/* 顧問先情報 */}
+      {selectedClientId ? (
+        <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">選択中の顧問先</h2>
+          <p className="text-blue-700 font-medium">
+            {clients.find((c) => c.id === selectedClientId)?.name}
+          </p>
+        </div>
+      ) : (
+        <div className="mb-6 bg-red-50 p-4 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">
+            顧問先が選択されていません
+          </h2>
+          <Link href="/" className="text-blue-600 hover:underline">
+            トップページで顧問先を選択してください
+          </Link>
+        </div>
+      )}
 
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
           title="Supabaseへ登録"
-          message={`選択した${
-            Object.values(receiptSelection).filter(Boolean).length
-          }件のレシートをSupabaseデータベースにエクスポートします。この操作は取り消せません。`}
+          message={`選択した${selectedCount}件のレシートをSupabaseデータベースにエクスポートします。この操作は取り消せません。`}
           confirmLabel="エクスポート"
           cancelLabel="キャンセル"
           onConfirm={handleExportToSupabase}
@@ -166,10 +191,7 @@ export default function ExportPage() {
                 <li>
                   顧問先: {clients.find((c) => c.id === selectedClientId)?.name}
                 </li>
-                <li>
-                  選択アイテム:{" "}
-                  {Object.values(receiptSelection).filter(Boolean).length}件
-                </li>
+                <li>選択アイテム: {selectedCount}件</li>
                 <li>授受区分: アップロード時に設定した値を使用します</li>
               </ul>
             </div>
@@ -180,7 +202,9 @@ export default function ExportPage() {
       {/* レシート選択 */}
       <div className="mb-20">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">登録するデータ選択</h2>
+          <h2 className="text-lg font-semibold">
+            登録可能なアイテム（レビュー完了のもの）
+          </h2>
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -193,8 +217,19 @@ export default function ExportPage() {
           </div>
         </div>
 
-        {receipts.length === 0 ? (
-          <p className="text-gray-500">登録可能なデータがありません</p>
+        {confirmedReceipts.length === 0 ? (
+          <div className="bg-yellow-50 p-4 rounded-lg text-center">
+            <p className="text-yellow-700">登録可能なデータがありません</p>
+            <p className="text-sm text-gray-600 mt-2">
+              レビューページで確認済みに設定したアイテムが表示されます
+            </p>
+            <Link
+              href="/review"
+              className="mt-3 text-blue-600 hover:underline inline-block"
+            >
+              レビューページへ
+            </Link>
+          </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -214,12 +249,12 @@ export default function ExportPage() {
                     種類
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    メモ
+                    授受区分
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {receipts.map((receipt) => (
+                {confirmedReceipts.map((receipt) => (
                   <tr
                     key={receipt.id}
                     className={receiptSelection[receipt.id] ? "bg-blue-50" : ""}
@@ -258,9 +293,24 @@ export default function ExportPage() {
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap">
                       {receipt.type}
+                      {receipt.subType && (
+                        <span className="ml-1 text-xs text-gray-500">
+                          ({receipt.subType})
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-4 truncate max-w-xs">
-                      {receipt.memo}
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          receipt.transferType === "受取"
+                            ? "bg-green-100 text-green-800"
+                            : receipt.transferType === "渡し"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {receipt.transferType || "未設定"}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -273,22 +323,14 @@ export default function ExportPage() {
       {/* 固定エクスポートボタン */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <span className="text-gray-500">
-            {Object.values(receiptSelection).filter(Boolean).length}件選択中
-          </span>
+          <span className="text-gray-500">{selectedCount}件選択中</span>
 
           <button
             onClick={() => setIsConfirmDialogOpen(true)}
-            disabled={
-              isSyncing ||
-              !selectedClientId ||
-              Object.values(receiptSelection).filter(Boolean).length === 0
-            }
+            disabled={isSyncing || !selectedClientId || selectedCount === 0}
             className={`px-6 py-2 rounded font-medium
               ${
-                isSyncing ||
-                !selectedClientId ||
-                Object.values(receiptSelection).filter(Boolean).length === 0
+                isSyncing || !selectedClientId || selectedCount === 0
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-blue-500 text-white hover:bg-blue-600"
               }
