@@ -1,5 +1,5 @@
 // src/pages/review.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../contexts/ClientContext";
@@ -31,17 +31,23 @@ export default function ReviewPage() {
     ? clients.find((c) => c.id === selectedClientId)
     : null;
 
-  // 現在のレシート
-  const currentReceipt = receipts[currentIndex] || null;
+  // 未確認アイテムのみをフィルタリング
+  const unconfirmedReceipts = useMemo(() => {
+    return receipts.filter((receipt) => !confirmedItems.has(receipt.id));
+  }, [receipts, confirmedItems]);
+
+  // 現在のレシート - 未確認のもののみから選択
+  const currentReceipt = unconfirmedReceipts[currentIndex] || null;
 
   // データが存在しない場合のインデックス調整
   useEffect(() => {
-    if (receipts.length === 0) {
+    if (unconfirmedReceipts.length === 0) {
       setCurrentIndex(0);
-    } else if (currentIndex >= receipts.length) {
-      setCurrentIndex(receipts.length - 1);
+    } else if (currentIndex >= unconfirmedReceipts.length) {
+      setCurrentIndex(Math.max(0, unconfirmedReceipts.length - 1));
     }
-  }, [receipts, currentIndex]);
+  }, [unconfirmedReceipts, currentIndex]);
+
   // 初期表示時にisConfirmedフラグがついているアイテムを確認済みセットに追加
   useEffect(() => {
     const newConfirmedItems = new Set<string>();
@@ -161,11 +167,14 @@ export default function ReviewPage() {
 
   // アイテムを確認済みとしてマーク
   const toggleConfirmed = (id: string) => {
+    // 現在のアイテムが要質問の場合は確認済みにできない
     const receipt = receipts.find((r) => r.id === id);
-    if (receipt) {
-      // isConfirmedフラグを更新
-      updateReceipt(id, { isConfirmed: !confirmedItems.has(id) });
+    if (receipt && receipt.status === "要質問") {
+      return; // 要質問の場合は何もしない
     }
+
+    // isConfirmedフラグを更新
+    updateReceipt(id, { isConfirmed: !confirmedItems.has(id) });
 
     setConfirmedItems((prev) => {
       const newSet = new Set(prev);
@@ -174,6 +183,8 @@ export default function ReviewPage() {
       } else {
         newSet.add(id);
       }
+      // セッションストレージに保存
+      sessionStorage.setItem("confirmedItems", JSON.stringify([...newSet]));
       return newSet;
     });
   };
@@ -187,7 +198,7 @@ export default function ReviewPage() {
 
   // 次のアイテムへ移動
   const goToNext = () => {
-    if (currentIndex < receipts.length - 1) {
+    if (currentIndex < unconfirmedReceipts.length - 1) {
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -265,9 +276,15 @@ export default function ReviewPage() {
       {receipts.length > 0 && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4 flex flex-col sm:flex-row justify-between items-center">
           <div className="mb-2 sm:mb-0">
-            <p className="font-medium">
-              {currentIndex + 1} / {receipts.length} アイテム表示中
-            </p>
+            {unconfirmedReceipts.length > 0 ? (
+              <p className="font-medium">
+                {currentIndex + 1} / {unconfirmedReceipts.length} アイテム表示中
+              </p>
+            ) : (
+              <p className="font-medium text-green-600">
+                すべてのアイテムが確認済みです
+              </p>
+            )}
             <p className="text-sm text-gray-600">
               {confirmedItems.size} / {receipts.length} アイテム確認済み
             </p>
@@ -286,6 +303,31 @@ export default function ReviewPage() {
                 ? `${confirmedItems.size}件をデータベース登録へ`
                 : "確認済みアイテムがありません"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {receipts.length > 0 && unconfirmedReceipts.length === 0 && (
+        <div className="mb-6 p-8 bg-green-50 rounded-lg text-center">
+          <p className="mb-2 text-green-700 font-medium">
+            すべてのアイテムが確認済みです！
+          </p>
+          <p className="mb-4 text-gray-600">
+            確認済みアイテムをエクスポートするか、アップロードページから新しいアイテムを追加してください。
+          </p>
+          <div className="flex justify-center gap-4">
+            <Link
+              href="/export"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 inline-block"
+            >
+              エクスポートページへ
+            </Link>
+            <Link
+              href="/upload"
+              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 inline-block"
+            >
+              アップロードページへ
+            </Link>
           </div>
         </div>
       )}
@@ -317,12 +359,21 @@ export default function ReviewPage() {
                     id="confirm-checkbox"
                     checked={confirmedItems.has(currentReceipt.id)}
                     onChange={() => toggleConfirmed(currentReceipt.id)}
-                    className="h-5 w-5"
+                    disabled={currentReceipt.status === "要質問"}
+                    className={`h-5 w-5 ${
+                      currentReceipt.status === "要質問"
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer"
+                    }`}
                   />
                 </div>
                 <label
                   htmlFor="confirm-checkbox"
-                  className={`font-medium cursor-pointer ${
+                  className={`font-medium ${
+                    currentReceipt.status === "要質問"
+                      ? "cursor-not-allowed text-gray-500"
+                      : "cursor-pointer"
+                  } ${
                     confirmedItems.has(currentReceipt.id)
                       ? "text-green-600"
                       : "text-gray-800"
@@ -330,6 +381,8 @@ export default function ReviewPage() {
                 >
                   {confirmedItems.has(currentReceipt.id)
                     ? "✓ 確認済み"
+                    : currentReceipt.status === "要質問"
+                    ? "要質問（確認済みにできません）"
                     : "未確認"}
                 </label>
                 <span className="ml-4 text-sm text-gray-500">
@@ -585,6 +638,10 @@ export default function ReviewPage() {
                           onChange={(e) => {
                             if (e.target.checked) {
                               handleUpdateField("status", "要質問");
+                              // 確認済みから外す
+                              if (confirmedItems.has(currentReceipt.id)) {
+                                toggleConfirmed(currentReceipt.id);
+                              }
                             }
                           }}
                           className="mr-2 h-5 w-5"
@@ -639,21 +696,26 @@ export default function ReviewPage() {
               </button>
               <button
                 onClick={() => toggleConfirmed(currentReceipt.id)}
+                disabled={currentReceipt.status === "要質問"}
                 className={`px-4 py-2 rounded ${
-                  confirmedItems.has(currentReceipt.id)
+                  currentReceipt.status === "要質問"
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : confirmedItems.has(currentReceipt.id)
                     ? "bg-green-100 text-green-700 hover:bg-green-200"
                     : "bg-blue-500 text-white hover:bg-blue-600"
                 }`}
               >
                 {confirmedItems.has(currentReceipt.id)
                   ? "確認済み ✓"
+                  : currentReceipt.status === "要質問"
+                  ? "要質問を解決してください"
                   : "確認済みにする"}
               </button>
               <button
                 onClick={goToNext}
-                disabled={currentIndex === receipts.length - 1}
+                disabled={currentIndex === unconfirmedReceipts.length - 1}
                 className={`px-4 py-2 rounded ${
-                  currentIndex === receipts.length - 1
+                  currentIndex === unconfirmedReceipts.length - 1
                     ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
@@ -688,6 +750,9 @@ export default function ReviewPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     種類
                   </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    操作
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -719,6 +784,17 @@ export default function ReviewPage() {
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap text-sm">
                         {receipt.type || "領収書"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleConfirmed(receipt.id);
+                          }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          確認解除
+                        </button>
                       </td>
                     </tr>
                   ))}

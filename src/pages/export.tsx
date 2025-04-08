@@ -1,3 +1,4 @@
+// src/pages/export.tsx
 import { useState, useEffect, useMemo } from "react";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../contexts/ClientContext";
@@ -6,7 +7,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import Link from "next/link";
 
 export default function ExportPage() {
-  const { receipts } = useReceiptContext();
+  const { receipts, updateReceipt, removeReceipt } = useReceiptContext();
   const { clients, selectedClientId } = useClientContext();
   const {
     syncReceiptsToSupabase,
@@ -21,13 +22,29 @@ export default function ExportPage() {
     [id: string]: boolean;
   }>({});
   const [selectAll, setSelectAll] = useState(false);
+  const [confirmedItems, setConfirmedItems] = useState<Set<string>>(new Set());
+
+  // 確認済みアイテムの読み込み
+  useEffect(() => {
+    const storedConfirmed = sessionStorage.getItem("confirmedItems");
+    if (storedConfirmed) {
+      try {
+        // JSON.parseの結果を明示的に型指定
+        const parsed: string[] = JSON.parse(storedConfirmed);
+        const confirmedSet = new Set<string>(parsed);
+        setConfirmedItems(confirmedSet);
+      } catch (e) {
+        console.error("Failed to parse confirmed items from storage:", e);
+      }
+    }
+  }, []);
 
   // レビューページで確認済み（isConfirmed=true）かつステータスが「完了」のアイテムのみを表示
   const confirmedReceipts = useMemo(() => {
     return receipts.filter(
-      (receipt) => receipt.isConfirmed === true && receipt.status === "完了"
+      (receipt) => confirmedItems.has(receipt.id) && receipt.status === "完了"
     );
-  }, [receipts]);
+  }, [receipts, confirmedItems]);
 
   // 選択状態の初期化 - 依存配列を確認し、receiptsのIDだけに依存するように修正
   useEffect(() => {
@@ -67,6 +84,24 @@ export default function ExportPage() {
       );
       setSelectAll(allSelected);
     }
+  };
+
+  // 確認済み状態を解除する関数
+  const toggleConfirmed = (id: string) => {
+    setConfirmedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      // セッションストレージにも保存
+      sessionStorage.setItem("confirmedItems", JSON.stringify([...newSet]));
+      return newSet;
+    });
+
+    // 確認済みフラグをアップデート
+    updateReceipt(id, { isConfirmed: false });
   };
 
   // Supabaseにエクスポート
@@ -125,6 +160,60 @@ export default function ExportPage() {
 
         successCount += result.success;
         failedCount += result.failed;
+      }
+
+      // 登録に成功したアイテムをクリア
+      if (successCount > 0) {
+        const exportedIds = selectedReceipts
+          .filter((_, index) => index < successCount)
+          .map((receipt) => receipt.id);
+
+        // BlobURLの解放
+        exportedIds.forEach((id) => {
+          const receipt = receipts.find((r) => r.id === id);
+          if (receipt) {
+            if (receipt.imageUrls) {
+              receipt.imageUrls.forEach((url) => {
+                if (url.startsWith("blob:")) {
+                  try {
+                    URL.revokeObjectURL(url);
+                  } catch (e) {
+                    console.error("Failed to revoke image URL:", e);
+                  }
+                }
+              });
+            }
+            if (receipt.pdfUrl.startsWith("blob:")) {
+              try {
+                URL.revokeObjectURL(receipt.pdfUrl);
+              } catch (e) {
+                console.error("Failed to revoke PDF URL:", e);
+              }
+            }
+          }
+
+          // 確認済みリストからも削除
+          setConfirmedItems((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            // セッションストレージにも保存
+            sessionStorage.setItem(
+              "confirmedItems",
+              JSON.stringify([...newSet])
+            );
+            return newSet;
+          });
+
+          // レシートを削除
+          removeReceipt(id);
+        });
+
+        // 選択状態を更新
+        const newSelection = { ...receiptSelection };
+        exportedIds.forEach((id) => {
+          delete newSelection[id];
+        });
+        setReceiptSelection(newSelection);
       }
 
       // 結果をユーザーに表示
@@ -194,6 +283,9 @@ export default function ExportPage() {
                 </li>
                 <li>選択アイテム: {selectedCount}件</li>
                 <li>授受区分: アップロード時に設定した値を使用します</li>
+                <li className="mt-2 text-red-600">
+                  注意: 登録したアイテムは自動的に削除されます
+                </li>
               </ul>
             </div>
           }
@@ -257,6 +349,9 @@ export default function ExportPage() {
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     メモ
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    確認状態
                   </th>
                 </tr>
               </thead>
@@ -324,6 +419,17 @@ export default function ExportPage() {
                     </td>
                     <td className="px-3 py-4 max-w-xs truncate">
                       {receipt.memo || "なし"}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleConfirmed(receipt.id);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm underline"
+                      >
+                        確認を解除
+                      </button>
                     </td>
                   </tr>
                 ))}
