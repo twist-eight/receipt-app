@@ -1,30 +1,24 @@
 // src/pages/review.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
+import { useClientContext } from "../contexts/ClientContext";
 import { useReloadWarning } from "../hooks/useReloadWarning";
-import ReceiptCard from "../components/ReceiptCard";
 import ConfirmDialog from "../components/ConfirmDialog";
-import GroupDialog from "../components/GroupDialog";
-import { ReceiptItem } from "../types/receipt";
-import { usePdfProcessing } from "../hooks/usePdfProcessing";
-import { v4 as uuidv4 } from "uuid";
+import ImageCarousel from "../components/ImageCarousel";
+import { ReceiptItem, ReceiptType, TransferType } from "../types/receipt";
 import Link from "next/link";
 
 export default function ReviewPage() {
-  const {
-    receipts,
-    // setReceipts を削除またはリネーム
-    updateReceipt,
-    removeReceipt,
-    clearReceipts,
-    addReceipt,
-  } = useReceiptContext();
+  const router = useRouter();
+  const { receipts, updateReceipt, removeReceipt, clearReceipts } =
+    useReceiptContext();
+  const { selectedClientId, clients } = useClientContext();
+  const [error, setError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
     useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState<boolean>(false);
-  const { mergePdfs } = usePdfProcessing();
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [confirmedItems, setConfirmedItems] = useState<Set<string>>(new Set());
 
   // リロード警告を有効化（データがある場合のみ）
   useReloadWarning(
@@ -32,14 +26,24 @@ export default function ReviewPage() {
     "ページをリロードすると画像とPDFが表示できなくなる可能性があります。続けますか？"
   );
 
-  const handleUpdateReceipt = <K extends keyof ReceiptItem>(
-    id: string,
-    field: K,
-    value: ReceiptItem[K]
-  ) => {
-    updateReceipt(id, { [field]: value });
-  };
+  // 選択中の顧問先情報
+  const selectedClient = selectedClientId
+    ? clients.find((c) => c.id === selectedClientId)
+    : null;
 
+  // 現在のレシート
+  const currentReceipt = receipts[currentIndex] || null;
+
+  // データが存在しない場合のインデックス調整
+  useEffect(() => {
+    if (receipts.length === 0) {
+      setCurrentIndex(0);
+    } else if (currentIndex >= receipts.length) {
+      setCurrentIndex(receipts.length - 1);
+    }
+  }, [receipts, currentIndex]);
+
+  // PDFを開く処理
   const handleOpenPdf = (pdfUrl: string) => {
     try {
       if (pdfUrl.startsWith("blob:") || pdfUrl.startsWith("http")) {
@@ -66,7 +70,10 @@ export default function ReviewPage() {
     }
   };
 
+  // アイテムを削除
   const handleDeleteItem = (id: string) => {
+    setIsConfirmDialogOpen(false);
+
     const receiptToDelete = receipts.find((receipt) => receipt.id === id);
     if (!receiptToDelete) return;
 
@@ -86,15 +93,23 @@ export default function ReviewPage() {
       console.error("Failed to revoke URLs:", e);
     }
 
-    // 選択リストからも削除
-    setSelectedItemIds((prev) =>
-      prev.filter((selectedId) => selectedId !== id)
-    );
+    // 確認済みアイテムリストからも削除
+    setConfirmedItems((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
 
     // コンテキスト経由で削除
     removeReceipt(id);
+
+    // インデックスを調整
+    if (currentIndex >= receipts.length - 1) {
+      setCurrentIndex(Math.max(0, receipts.length - 2));
+    }
   };
 
+  // すべてのデータをクリア
   const handleClearAllData = () => {
     // BlobURLを解放
     receipts.forEach((receipt) => {
@@ -121,137 +136,98 @@ export default function ReviewPage() {
     // コンテキスト経由で全削除
     clearReceipts();
     setIsConfirmDialogOpen(false);
-    // 選択状態もクリア
-    setSelectedItemIds([]);
+    // 確認済みアイテムもクリア
+    setConfirmedItems(new Set());
   };
 
-  const toggleItemSelection = (id: string, isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedItemIds((prev) => [...prev, id]);
-    } else {
-      setSelectedItemIds((prev) => prev.filter((itemId) => itemId !== id));
+  // フィールド更新
+  const handleUpdateField = <K extends keyof ReceiptItem>(
+    field: K,
+    value: ReceiptItem[K]
+  ) => {
+    if (!currentReceipt) return;
+    updateReceipt(currentReceipt.id, { [field]: value });
+  };
+
+  // アイテムを確認済みとしてマーク
+  const toggleConfirmed = (id: string) => {
+    setConfirmedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // 前のアイテムへ移動
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
     }
   };
 
-  const handleGroupConfirm = async () => {
-    if (selectedItemIds.length < 2) {
-      setError("グループ化するには2つ以上のアイテムを選択してください");
-      return;
+  // 次のアイテムへ移動
+  const goToNext = () => {
+    if (currentIndex < receipts.length - 1) {
+      setCurrentIndex(currentIndex + 1);
     }
+  };
 
-    try {
-      // 選択したアイテムを取得
-      const selectedItems = receipts.filter((item) =>
-        selectedItemIds.includes(item.id)
-      );
+  // Supabase登録ページへ移動
+  const goToExport = () => {
+    router.push("/export");
+  };
 
-      // PDFをマージ
-      const pdfUrls = selectedItems.map((item) => item.pdfUrl);
-      const { mergedPdfUrl, mergedImageUrls } = await mergePdfs(pdfUrls);
+  // 種類のオプション
+  const typeOptions: ReceiptType[] = [
+    "領収書",
+    "明細書",
+    "契約書",
+    "見積書",
+    "通帳",
+  ];
 
-      // 新しいグループアイテムを作成 (グループ名なしで)
-      const newGroupItem: ReceiptItem = {
-        id: uuidv4(),
-        imageUrls: mergedImageUrls, // 全てのページの画像URLを配列として保存
-        pdfUrl: mergedPdfUrl,
-        date: selectedItems[0].date,
-        updatedAt: new Date().toISOString().split("T")[0], // 今日の日付を追加
-        vendor: selectedItems[0].vendor,
-        amount: selectedItems.reduce(
-          (sum, item) => sum + (item.amount || 0),
-          0
-        ),
-        type: selectedItems[0].type,
-        memo: `グループ: ${selectedItems
-          .map((item) => item.vendor || "Unnamed")
-          .join(", ")}`,
-        tag: selectedItems[0].tag,
-        status: selectedItems[0].status,
-      };
+  // 授受区分のオプション
+  const transferTypeOptions: TransferType[] = ["受取", "渡し", "内部資料"];
 
-      // 元のアイテムを削除
-      selectedItemIds.forEach((id) => {
-        const item = receipts.find((r) => r.id === id);
-        if (item) {
-          // BlobURLを解放
-          if (item.imageUrls) {
-            item.imageUrls.forEach((url) => {
-              if (url.startsWith("blob:")) {
-                try {
-                  URL.revokeObjectURL(url);
-                } catch {}
-              }
-            });
-          }
-          if (item.pdfUrl.startsWith("blob:")) {
-            try {
-              URL.revokeObjectURL(item.pdfUrl);
-            } catch {}
-          }
-          removeReceipt(id);
-        }
-      });
+  // 選択したタイプのサブタイプを取得する関数
+  const getSubTypesForSelectedType = (type: string | null) => {
+    if (!selectedClient || !type) return [];
 
-      // 新しいグループアイテムを追加
-      addReceipt(newGroupItem);
-
-      // 選択をリセット
-      setSelectedItemIds([]);
-      setIsGroupDialogOpen(false);
-    } catch (error) {
-      console.error("PDFのグループ化に失敗しました:", error);
-      setError("PDFのグループ化に失敗しました");
-    }
+    const docType = selectedClient.documentTypes.find((dt) => dt.type === type);
+    return docType ? docType.subTypes : [];
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold">OCR結果の確認と編集</h1>
 
         <div className="flex gap-2">
           {receipts.length > 0 && (
-            <>
-              {selectedItemIds.length >= 2 && (
-                <button
-                  onClick={() => setIsGroupDialogOpen(true)}
-                  className="px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center text-sm"
-                  aria-label="選択したアイテムをグループ化"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                  </svg>
-                  {selectedItemIds.length}件をグループ化
-                </button>
-              )}
-
-              <button
-                onClick={() => setIsConfirmDialogOpen(true)}
-                className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 flex items-center text-sm"
-                aria-label="全データをクリア"
+            <button
+              onClick={() => setIsConfirmDialogOpen(true)}
+              className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 flex items-center text-sm"
+              aria-label="全データをクリア"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 mr-1"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                全データをクリア
-              </button>
-            </>
+                <path
+                  fillRule="evenodd"
+                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              全データをクリア
+            </button>
           )}
         </div>
       </div>
@@ -269,28 +245,30 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* 選択情報と制御エリア */}
+      {/* 進捗状況と登録ボタン */}
       {receipts.length > 0 && (
-        <div className="bg-gray-50 p-3 rounded-lg mb-4 flex justify-between items-center">
-          <div>
-            <span className="text-sm font-medium">
-              {selectedItemIds.length} / {receipts.length} アイテムを選択中
-            </span>
+        <div className="bg-gray-50 p-4 rounded-lg mb-4 flex flex-col sm:flex-row justify-between items-center">
+          <div className="mb-2 sm:mb-0">
+            <p className="font-medium">
+              {currentIndex + 1} / {receipts.length} アイテム表示中
+            </p>
+            <p className="text-sm text-gray-600">
+              {confirmedItems.size} / {receipts.length} アイテム確認済み
+            </p>
           </div>
-          <div>
+          <div className="flex gap-3">
             <button
-              onClick={() =>
-                setSelectedItemIds(
-                  selectedItemIds.length === receipts.length
-                    ? []
-                    : receipts.map((r) => r.id)
-                )
-              }
-              className="text-sm text-blue-600 hover:underline"
+              onClick={goToExport}
+              disabled={confirmedItems.size === 0}
+              className={`px-4 py-2 rounded font-medium ${
+                confirmedItems.size === 0
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-green-500 text-white hover:bg-green-600"
+              }`}
             >
-              {selectedItemIds.length === receipts.length
-                ? "全て選択解除"
-                : "全て選択"}
+              {confirmedItems.size > 0
+                ? `${confirmedItems.size}件をデータベース登録へ`
+                : "確認済みアイテムがありません"}
             </button>
           </div>
         </div>
@@ -310,47 +288,370 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* レシートカードのグリッドレイアウトを改善 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {receipts.map((receipt) => (
-          <div key={receipt.id} className="relative">
-            <button
-              onClick={() => handleDeleteItem(receipt.id)}
-              className="absolute top-2 right-2 z-10 text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors"
-              aria-label={`${receipt.vendor || "レシート"}を削除`}
-              title="このレシートを削除"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
+      {/* アイテム表示部分 */}
+      {currentReceipt && (
+        <div className="mb-8">
+          <div className="bg-white rounded-lg shadow-md p-4">
+            {/* ヘッダー部分：ID、削除ボタン */}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <div className="mr-2">
+                  <input
+                    type="checkbox"
+                    id="confirm-checkbox"
+                    checked={confirmedItems.has(currentReceipt.id)}
+                    onChange={() => toggleConfirmed(currentReceipt.id)}
+                    className="h-5 w-5"
+                  />
+                </div>
+                <label
+                  htmlFor="confirm-checkbox"
+                  className={`font-medium cursor-pointer ${
+                    confirmedItems.has(currentReceipt.id)
+                      ? "text-green-600"
+                      : "text-gray-800"
+                  }`}
+                >
+                  {confirmedItems.has(currentReceipt.id)
+                    ? "✓ 確認済み"
+                    : "未確認"}
+                </label>
+                <span className="ml-4 text-sm text-gray-500">
+                  ID: {currentReceipt.id.substring(0, 8)}...
+                </span>
+              </div>
+              <button
+                onClick={() => handleDeleteItem(currentReceipt.id)}
+                className="text-red-500 hover:text-red-700 p-1"
+                aria-label="削除"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
 
-            <ReceiptCard
-              receipt={receipt}
-              onChange={(field, value) =>
-                handleUpdateReceipt(receipt.id, field, value)
-              }
-              onOpenPdf={handleOpenPdf}
-              isSelected={selectedItemIds.includes(receipt.id)}
-              onSelectChange={(isSelected) =>
-                toggleItemSelection(receipt.id, isSelected)
-              }
-              showCheckbox={true}
-              onDelete={() => handleDeleteItem(receipt.id)}
-            />
+            {/* コンテンツ部分：画像と入力フォーム */}
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* 左側：画像カルーセル */}
+              <div className="w-full md:w-1/2">
+                {currentReceipt.imageUrls &&
+                currentReceipt.imageUrls.length > 0 ? (
+                  <div>
+                    <ImageCarousel
+                      images={currentReceipt.imageUrls}
+                      className="h-120"
+                    />
+                    {currentReceipt.pdfUrl && (
+                      <button
+                        onClick={() => handleOpenPdf(currentReceipt.pdfUrl)}
+                        className="mt-2 text-blue-600 underline text-sm hover:text-blue-800 flex items-center justify-center w-full"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 mr-1"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          />
+                        </svg>
+                        PDFを開く
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center bg-gray-100 rounded">
+                    <p className="text-gray-500">画像がありません</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 右側：入力フォーム */}
+              <div className="w-full md:w-1/2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      日付
+                    </label>
+                    <input
+                      type="date"
+                      value={currentReceipt.date || ""}
+                      onChange={(e) =>
+                        handleUpdateField("date", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      金額
+                    </label>
+                    <input
+                      type="number"
+                      value={currentReceipt.amount || ""}
+                      placeholder="金額"
+                      onChange={(e) =>
+                        handleUpdateField("amount", Number(e.target.value))
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">
+                      取引先
+                    </label>
+                    <input
+                      type="text"
+                      value={currentReceipt.vendor || ""}
+                      placeholder="取引先"
+                      onChange={(e) =>
+                        handleUpdateField("vendor", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      種類
+                    </label>
+                    <select
+                      value={currentReceipt.type || "領収書"}
+                      onChange={(e) =>
+                        handleUpdateField("type", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {typeOptions.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      授受区分
+                    </label>
+                    <select
+                      value={currentReceipt.transferType || "受取"}
+                      onChange={(e) =>
+                        handleUpdateField(
+                          "transferType",
+                          e.target.value as TransferType
+                        )
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {transferTypeOptions.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* サブタイプがある場合のみ表示 */}
+                  {currentReceipt.type &&
+                    getSubTypesForSelectedType(currentReceipt.type).length >
+                      0 && (
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">
+                          サブタイプ
+                        </label>
+                        <select
+                          value={currentReceipt.subType || ""}
+                          onChange={(e) =>
+                            handleUpdateField("subType", e.target.value)
+                          }
+                          className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">選択してください</option>
+                          {getSubTypesForSelectedType(currentReceipt.type).map(
+                            (subType) => (
+                              <option key={subType} value={subType}>
+                                {subType}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+                    )}
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      タグ
+                    </label>
+                    <input
+                      type="text"
+                      value={currentReceipt.tag || ""}
+                      placeholder="タグ（交際費など）"
+                      onChange={(e) => handleUpdateField("tag", e.target.value)}
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      ステータス
+                    </label>
+                    <select
+                      value={currentReceipt.status || "完了"}
+                      onChange={(e) =>
+                        handleUpdateField("status", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="完了">完了</option>
+                      <option value="要質問">要質問</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">
+                      メモ
+                    </label>
+                    <textarea
+                      value={currentReceipt.memo || ""}
+                      placeholder="メモ"
+                      onChange={(e) =>
+                        handleUpdateField("memo", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500 h-20"
+                    />
+                  </div>
+                </div>
+
+                {/* 更新日時表示 */}
+                {currentReceipt.updatedAt && (
+                  <p className="text-xs text-gray-500 mt-4">
+                    最終更新: {currentReceipt.updatedAt}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* ナビゲーションボタン */}
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={goToPrevious}
+                disabled={currentIndex === 0}
+                className={`px-4 py-2 rounded ${
+                  currentIndex === 0
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                ← 前へ
+              </button>
+              <button
+                onClick={() => toggleConfirmed(currentReceipt.id)}
+                className={`px-4 py-2 rounded ${
+                  confirmedItems.has(currentReceipt.id)
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+              >
+                {confirmedItems.has(currentReceipt.id)
+                  ? "確認済み ✓"
+                  : "確認済みにする"}
+              </button>
+              <button
+                onClick={goToNext}
+                disabled={currentIndex === receipts.length - 1}
+                className={`px-4 py-2 rounded ${
+                  currentIndex === receipts.length - 1
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                次へ →
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* 確認済みアイテム一覧 */}
+      {confirmedItems.size > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3">確認済みアイテム一覧</h2>
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    日付
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    取引先
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    金額
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    種類
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {receipts
+                  .filter((receipt) => confirmedItems.has(receipt.id))
+                  .map((receipt) => (
+                    <tr
+                      key={receipt.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() =>
+                        setCurrentIndex(
+                          receipts.findIndex((r) => r.id === receipt.id)
+                        )
+                      }
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                        {receipt.id.substring(0, 8)}...
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        {receipt.date || "未設定"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        {receipt.vendor || "未設定"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        {receipt.amount
+                          ? `¥${receipt.amount.toLocaleString()}`
+                          : "未設定"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        {receipt.type || "領収書"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
@@ -362,15 +663,6 @@ export default function ReviewPage() {
           onConfirm={handleClearAllData}
           onCancel={() => setIsConfirmDialogOpen(false)}
           isDestructive={true}
-        />
-      )}
-
-      {/* グループ化ダイアログ */}
-      {isGroupDialogOpen && (
-        <GroupDialog
-          selectedCount={selectedItemIds.length}
-          onConfirm={handleGroupConfirm}
-          onCancel={() => setIsGroupDialogOpen(false)}
         />
       )}
     </div>
