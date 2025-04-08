@@ -383,7 +383,89 @@ export default function ReviewPage() {
 
               {/* 右側：入力フォーム */}
               <div className="w-full md:w-1/2">
+                {/* 授受区分ボタン選択 */}
+                <div className="mb-4">
+                  <p className="text-sm font-medium mb-2">授受区分：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {transferTypeOptions.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handleUpdateField("transferType", type)}
+                        className={`px-3 py-2 rounded text-sm ${
+                          currentReceipt.transferType === type
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                        type="button"
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 種類ボタン選択 */}
+                <div className="mb-4">
+                  <p className="text-sm font-medium mb-2">種類：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {typeOptions.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handleUpdateField("type", type)}
+                        className={`px-3 py-2 rounded text-sm ${
+                          currentReceipt.type === type
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                        type="button"
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* サブタイプボタン選択 - 選択されたtypeにサブタイプがある場合のみ表示 */}
+                {currentReceipt.type &&
+                  getSubTypesForSelectedType(currentReceipt.type).length >
+                    0 && (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-2">サブタイプ：</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getSubTypesForSelectedType(currentReceipt.type).map(
+                          (subType) => (
+                            <button
+                              key={subType}
+                              onClick={() =>
+                                handleUpdateField("subType", subType)
+                              }
+                              className={`px-3 py-2 rounded text-sm ${
+                                currentReceipt.subType === subType
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              }`}
+                              type="button"
+                            >
+                              {subType}
+                            </button>
+                          )
+                        )}
+                        {/* サブタイプをクリアするボタン */}
+                        {currentReceipt.subType && (
+                          <button
+                            onClick={() => handleUpdateField("subType", "")}
+                            className="px-3 py-2 rounded text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            type="button"
+                          >
+                            クリア
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 日付フィールド */}
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
                       日付
@@ -398,6 +480,33 @@ export default function ReviewPage() {
                     />
                   </div>
 
+                  {/* 取引先フィールド - 授受区分に応じてラベルを変更 */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {currentReceipt.transferType === "受取"
+                        ? "取引先"
+                        : currentReceipt.transferType === "渡し"
+                        ? "種類"
+                        : "種類"}
+                    </label>
+                    <input
+                      type="text"
+                      value={currentReceipt.vendor || ""}
+                      placeholder={
+                        currentReceipt.transferType === "受取"
+                          ? "取引先"
+                          : currentReceipt.transferType === "渡し"
+                          ? "申告書etc"
+                          : "根拠資料etc"
+                      }
+                      onChange={(e) =>
+                        handleUpdateField("vendor", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* 金額フィールド */}
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
                       金額
@@ -413,89 +522,7 @@ export default function ReviewPage() {
                     />
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">
-                      取引先
-                    </label>
-                    <input
-                      type="text"
-                      value={currentReceipt.vendor || ""}
-                      placeholder="取引先"
-                      onChange={(e) =>
-                        handleUpdateField("vendor", e.target.value)
-                      }
-                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      種類
-                    </label>
-                    <select
-                      value={currentReceipt.type || "領収書"}
-                      onChange={(e) =>
-                        handleUpdateField("type", e.target.value)
-                      }
-                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      {typeOptions.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      授受区分
-                    </label>
-                    <select
-                      value={currentReceipt.transferType || "受取"}
-                      onChange={(e) =>
-                        handleUpdateField(
-                          "transferType",
-                          e.target.value as TransferType
-                        )
-                      }
-                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      {transferTypeOptions.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* サブタイプがある場合のみ表示 */}
-                  {currentReceipt.type &&
-                    getSubTypesForSelectedType(currentReceipt.type).length >
-                      0 && (
-                      <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-500 mb-1">
-                          サブタイプ
-                        </label>
-                        <select
-                          value={currentReceipt.subType || ""}
-                          onChange={(e) =>
-                            handleUpdateField("subType", e.target.value)
-                          }
-                          className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="">選択してください</option>
-                          {getSubTypesForSelectedType(currentReceipt.type).map(
-                            (subType) => (
-                              <option key={subType} value={subType}>
-                                {subType}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </div>
-                    )}
-
+                  {/* タグフィールド */}
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">
                       タグ
@@ -509,22 +536,54 @@ export default function ReviewPage() {
                     />
                   </div>
 
-                  <div>
+                  {/* ステータスチェックボックス */}
+                  <div className="md:col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">
                       ステータス
                     </label>
-                    <select
-                      value={currentReceipt.status || "完了"}
-                      onChange={(e) =>
-                        handleUpdateField("status", e.target.value)
-                      }
-                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="完了">完了</option>
-                      <option value="要質問">要質問</option>
-                    </select>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="status-complete"
+                          checked={currentReceipt.status === "完了"}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleUpdateField("status", "完了");
+                            }
+                          }}
+                          className="mr-2 h-5 w-5"
+                        />
+                        <label
+                          htmlFor="status-complete"
+                          className="text-sm cursor-pointer"
+                        >
+                          完了
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="status-question"
+                          checked={currentReceipt.status === "要質問"}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleUpdateField("status", "要質問");
+                            }
+                          }}
+                          className="mr-2 h-5 w-5"
+                        />
+                        <label
+                          htmlFor="status-question"
+                          className="text-sm cursor-pointer"
+                        >
+                          要質問
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
+                  {/* メモフィールド */}
                   <div className="md:col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">
                       メモ
