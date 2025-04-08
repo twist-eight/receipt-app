@@ -22,10 +22,11 @@ export default function ExportPage() {
   }>({});
   const [selectAll, setSelectAll] = useState(false);
 
-  // レビューページで確認済みのアイテムのみを表示するようにフィルタリング
-  // useMemoを使って不要な再計算を防止
+  // レビューページで確認済み（isConfirmed=true）かつステータスが「完了」のアイテムのみを表示
   const confirmedReceipts = useMemo(() => {
-    return receipts.filter((receipt) => receipt.status === "完了");
+    return receipts.filter(
+      (receipt) => receipt.isConfirmed === true && receipt.status === "完了"
+    );
   }, [receipts]);
 
   // 選択状態の初期化 - 依存配列を確認し、receiptsのIDだけに依存するように修正
@@ -203,7 +204,7 @@ export default function ExportPage() {
       <div className="mb-20">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold">
-            登録可能なアイテム（レビュー完了のもの）
+            登録可能なアイテム（確認済みかつレビュー完了のもの）
           </h2>
           <div className="flex items-center">
             <input
@@ -250,6 +251,12 @@ export default function ExportPage() {
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     授受区分
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    タグ
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    メモ
                   </th>
                 </tr>
               </thead>
@@ -311,6 +318,12 @@ export default function ExportPage() {
                       >
                         {receipt.transferType || "未設定"}
                       </span>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      {receipt.tag || "未設定"}
+                    </td>
+                    <td className="px-3 py-4 max-w-xs truncate">
+                      {receipt.memo || "なし"}
                     </td>
                   </tr>
                 ))}

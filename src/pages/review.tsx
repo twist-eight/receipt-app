@@ -42,6 +42,16 @@ export default function ReviewPage() {
       setCurrentIndex(receipts.length - 1);
     }
   }, [receipts, currentIndex]);
+  // 初期表示時にisConfirmedフラグがついているアイテムを確認済みセットに追加
+  useEffect(() => {
+    const newConfirmedItems = new Set<string>();
+    receipts.forEach((receipt) => {
+      if (receipt.isConfirmed) {
+        newConfirmedItems.add(receipt.id);
+      }
+    });
+    setConfirmedItems(newConfirmedItems);
+  }, [receipts]);
 
   // PDFを開く処理
   const handleOpenPdf = (pdfUrl: string) => {
@@ -151,6 +161,12 @@ export default function ReviewPage() {
 
   // アイテムを確認済みとしてマーク
   const toggleConfirmed = (id: string) => {
+    const receipt = receipts.find((r) => r.id === id);
+    if (receipt) {
+      // isConfirmedフラグを更新
+      updateReceipt(id, { isConfirmed: !confirmedItems.has(id) });
+    }
+
     setConfirmedItems((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
