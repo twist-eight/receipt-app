@@ -17,12 +17,20 @@ export type ReceiptType = "領収書" | "明細書" | "契約書" | "見積書" 
 
 export type ReceiptStatus = "完了" | "要質問";
 
-export interface ReceiptFormState {
+export type TransferType = "受取" | "渡し" | "内部資料";
+
+export interface ReceiptItem {
+  id: string;
+  imageUrls: string[];
+  pdfUrl: string;
   date: string;
+  updatedAt: string;
   vendor: string;
   amount: number;
-  type: ReceiptType;
+  type: string;
   memo: string;
   tag: string;
-  status: ReceiptStatus;
+  status: string;
+  transferType?: TransferType; // 授受区分を追加
+  subType?: string; // サブタイプも追加しておく
 }

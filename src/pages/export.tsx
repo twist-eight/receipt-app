@@ -123,32 +123,37 @@ export default function ExportPage() {
         selectedReceiptIds.includes(receipt.id)
       );
 
-      // Supabaseのオプションを設定
-      const syncOptions: SupabaseSyncOptions = {
-        transferType: selectedTransferType,
-        subType: selectedSubType || undefined,
-      };
-
-      // Supabaseにエクスポート
-      const result = await syncReceiptsToSupabase(
-        selectedReceipts,
-        client,
-        syncOptions
-      );
-
-      // 結果をユーザーに表示
-      alert(
-        `エクスポート完了: ${result.success}件成功, ${result.failed}件失敗`
-      );
-
-      // 進捗状況を表示するためにsyncStatusを使用
-      if (syncStatus.failed > 0) {
-        console.log(
-          `一部のアイテムがエクスポートできませんでした: ${
-            syncStatus.success
-          }/${syncStatus.success + syncStatus.failed} 成功`
+      // 各レシートの授受区分をチェック
+      if (selectedReceipts.some((receipt) => !receipt.transferType)) {
+        throw new Error(
+          "一部のレシートに授受区分が設定されていません。アップロードし直してください。"
         );
       }
+
+      // 各レシートごとに個別の授受区分とサブタイプを使用してエクスポート
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const receipt of selectedReceipts) {
+        // 各レシートの授受区分とサブタイプを使用
+        const syncOptions: SupabaseSyncOptions = {
+          transferType: receipt.transferType || "受取", // デフォルト値を設定
+          subType: receipt.subType || undefined,
+        };
+
+        // 1件ずつエクスポート
+        const result = await syncReceiptsToSupabase(
+          [receipt],
+          client,
+          syncOptions
+        );
+
+        successCount += result.success;
+        failedCount += result.failed;
+      }
+
+      // 結果をユーザーに表示
+      alert(`エクスポート完了: ${successCount}件成功, ${failedCount}件失敗`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`エクスポート中にエラーが発生しました: ${errorMessage}`);
@@ -307,11 +312,11 @@ export default function ExportPage() {
                 <li>
                   顧問先: {clients.find((c) => c.id === selectedClientId)?.name}
                 </li>
-                <li>授受区分: {selectedTransferType}</li>
-                {selectedDocType && (
-                  <li>ドキュメント種類: {selectedDocType}</li>
-                )}
-                {selectedSubType && <li>サブタイプ: {selectedSubType}</li>}
+                <li>
+                  選択アイテム:{" "}
+                  {Object.values(receiptSelection).filter(Boolean).length}件
+                </li>
+                <li>授受区分: アップロード時に設定した値を使用します</li>
               </ul>
             </div>
           }
