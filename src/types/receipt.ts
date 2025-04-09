@@ -1,11 +1,12 @@
-// src/types/receipt.ts
 export interface ReceiptItem {
   id: string;
-  imageUrls: string[]; // Changed from imageUrl to imageUrls array
+  imageUrls: string[];
   pdfUrl: string;
-  pdfPath?: string; // 追加: PDFのストレージパス
-  date: string; // 領収書の日付、初期値は空に
-  updatedAt: string; // 追加: 更新日時
+  pdfPath?: string;
+  thumbnailPath?: string; // 変更: サムネイルパスを保存
+  thumbnailUrl?: string; // 追加: 表示用のサムネイルURL
+  date: string;
+  updatedAt: string;
   vendor: string;
   amount: number;
   type: string;
@@ -14,7 +15,7 @@ export interface ReceiptItem {
   status: string;
   transferType?: TransferType;
   subType?: string;
-  isConfirmed?: boolean; // 追加：確認済みフラグ
+  isConfirmed?: boolean;
 }
 
 export type ReceiptType = "領収書" | "明細書" | "契約書" | "見積書" | "通帳";

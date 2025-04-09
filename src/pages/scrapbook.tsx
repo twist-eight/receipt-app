@@ -1,5 +1,6 @@
 // src/pages/scrapbook.tsx
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useClientContext } from "../contexts/ClientContext";
 import { fetchSavedReceipts } from "../utils/receiptApi";
 import { ReceiptItem } from "../types/receipt";
@@ -349,32 +350,92 @@ export default function ScrapbookPage() {
                       className="h-40 bg-gray-50 cursor-pointer relative"
                       onClick={() => handleOpenPdf(receipt.pdfUrl)}
                     >
-                      <div className="h-full flex items-center justify-center bg-gray-100">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-12 w-12 text-gray-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      {receipt.thumbnailUrl ? (
+                        <div className="h-full w-full flex items-center justify-center overflow-hidden relative">
+                          <Image
+                            src={receipt.thumbnailUrl}
+                            alt={receipt.vendor || "レシート"}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 25vw"
+                            className="object-contain"
+                            onError={(e) => {
+                              // エラー時はプレースホルダーを表示
+                              const imgElement = e.target as HTMLImageElement;
+                              imgElement.onerror = null; // 無限ループ防止
+                              imgElement.src =
+                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'%3E%3C/path%3E%3C/svg%3E";
+                            }}
                           />
-                        </svg>
-                      </div>
-
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center bg-gray-100">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-12 w-12 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+                        </div>
+                      )}
                       {/* 授受区分アイコンを左上に表示 */}
-                      <div className="absolute top-2 left-2">
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs ${getTransferTypeStyle(
-                            receipt.transferType
-                          )}`}
-                        >
-                          {receipt.transferType || "未設定"}
-                        </span>
+                      <div
+                        className="h-40 bg-gray-50 cursor-pointer relative"
+                        onClick={() => handleOpenPdf(receipt.pdfUrl)}
+                      >
+                        {receipt.thumbnailUrl ? (
+                          <div className="h-full w-full flex items-center justify-center overflow-hidden">
+                            <Image
+                              src={receipt.thumbnailUrl}
+                              alt={receipt.vendor || "レシート"}
+                              fill
+                              sizes="(max-width: 768px) 100vw, 25vw"
+                              className="object-contain"
+                              onError={(e) => {
+                                // エラー時はプレースホルダーを表示
+                                const imgElement = e.target as HTMLImageElement;
+                                imgElement.onerror = null; // 無限ループ防止
+                                imgElement.src =
+                                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'%3E%3C/path%3E%3C/svg%3E";
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center bg-gray-100">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-12 w-12 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* 授受区分アイコンを左上に表示（変更なし） */}
+                        <div className="absolute top-2 left-2">
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full text-xs ${getTransferTypeStyle(
+                              receipt.transferType
+                            )}`}
+                          >
+                            {receipt.transferType || "未設定"}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

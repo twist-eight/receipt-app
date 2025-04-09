@@ -132,7 +132,7 @@ export function usePdfProcessing() {
     }
   };
 
-  // PDFをマージする関数（修正版）
+  // PDFをマージする関数
   const mergePdfs = async (
     pdfUrls: string[]
   ): Promise<{ mergedPdfUrl: string; mergedImageUrls: string[] }> => {
@@ -197,7 +197,77 @@ export function usePdfProcessing() {
     }
   };
 
-  // ファイルを処理して受領書アイテムを作成（修正版）
+  // PDFからサムネイルを生成する関数（Blob形式で返す）
+  const generateThumbnail = async (
+    pdfData: Uint8Array,
+    maxWidth = 200,
+    maxHeight = 200
+  ): Promise<Blob> => {
+    try {
+      // PDFの最初のページを低解像度でレンダリング
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      const page = await pdf.getPage(1); // 最初のページのみ使用
+
+      // 適切なスケールを計算（小さいサイズに抑える）
+      const viewport = page.getViewport({ scale: 1.0 });
+      const scale = Math.min(
+        maxWidth / viewport.width,
+        maxHeight / viewport.height
+      );
+      const scaledViewport = page.getViewport({ scale });
+
+      // キャンバスにレンダリング
+      const canvas = document.createElement("canvas");
+      canvas.width = scaledViewport.width;
+      canvas.height = scaledViewport.height;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Canvas context could not be created");
+      }
+
+      await page.render({ canvasContext: context, viewport: scaledViewport })
+        .promise;
+
+      // JPEG形式でBlobとして返す（品質を下げて容量を削減）
+      return new Promise<Blob>((resolve) => {
+        canvas.toBlob(
+          (blob) => {
+            resolve(blob || new Blob([]));
+          },
+          "image/jpeg",
+          0.5
+        );
+      });
+    } catch (err) {
+      console.error("Error generating thumbnail:", err);
+      setError("サムネイル生成に失敗しました");
+
+      // エラー時は空のBlobを返す
+      return new Blob([]);
+    }
+  };
+
+  // 一時的な表示用URL生成関数
+  const createThumbnailUrl = async (thumbnailBlob: Blob): Promise<string> => {
+    if (thumbnailBlob.size === 0) {
+      // デフォルトのプレースホルダー画像SVGを返す
+      return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'%3E%3C/path%3E%3C/svg%3E";
+    }
+    return URL.createObjectURL(thumbnailBlob);
+  };
+
+  // ヘルパー関数：BlobをBase64に変換
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  // ファイルを処理して受領書アイテムを作成
   const processFiles = async (
     files: File[],
     mergeMode: boolean
@@ -221,15 +291,27 @@ export function usePdfProcessing() {
             // 全ページの画像を取得
             const imageUrls = await pdfToImages(fileData);
 
+            // サムネイルBlobを生成して一時URLを作成
+            const thumbnailBlob = await generateThumbnail(fileData);
+            const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
+
+            // キャッシュに保存（後でアップロード時に使用）
+            const receiptId = uuidv4();
+            sessionStorage.setItem(
+              `thumbnail_${receiptId}`,
+              await blobToBase64(thumbnailBlob)
+            );
+
             results.push({
-              id: uuidv4(),
-              imageUrls, // 全ページ分の画像を保存
+              id: receiptId,
+              imageUrls,
               pdfUrl,
-              date: "", // 日付を空に変更
-              updatedAt: today, // 更新日を追加
+              thumbnailUrl, // 一時的なURL（表示用）
+              date: "",
+              updatedAt: today,
               vendor: "",
               amount: 0,
-              type: "領収書", // デフォルト値
+              type: "領収書",
               memo: "",
               tag: "",
               status: "完了",
@@ -238,35 +320,87 @@ export function usePdfProcessing() {
             // PDFの各ページを別々の受領書として処理
             const pages = await splitPdfPages(file);
 
-            pages.forEach((page) => {
+            for (let i = 0; i < pages.length; i++) {
+              const page = pages[i];
+              const pageBlob = await (await fetch(page.pdfUrl)).blob();
+              const pageArrayBuffer = await pageBlob.arrayBuffer();
+              const pageData = new Uint8Array(pageArrayBuffer);
+              // サムネイルBlobを生成して一時URLを作成
+              const thumbnailBlob = await generateThumbnail(pageData);
+              const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
+
+              // キャッシュに保存
+              const receiptId = uuidv4();
+              sessionStorage.setItem(
+                `thumbnail_${receiptId}`,
+                await blobToBase64(thumbnailBlob)
+              );
+
               results.push({
-                id: uuidv4(),
-                imageUrls: [page.imageUrl], // 配列として保存
+                id: receiptId,
+                imageUrls: [page.imageUrl],
                 pdfUrl: page.pdfUrl,
-                date: "", // 日付を空に変更
-                updatedAt: today, // 更新日を追加
+                thumbnailUrl, // 一時的なURL（表示用）
+                date: "",
+                updatedAt: today,
                 vendor: "",
                 amount: 0,
-                type: "領収書", // デフォルト値
+                type: "領収書",
                 memo: "",
                 tag: "",
                 status: "完了",
               });
-            });
+            }
           }
         } else if (file.type.startsWith("image/")) {
           // 画像ファイルをPDFに変換
           const { imageUrl, pdfUrl } = await convertImageToPdf(file);
 
+          // 画像ファイルの場合は、そのまま縮小してサムネイルとして使用
+          const img = new Image();
+          img.src = imageUrl;
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+          });
+
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
+          // 適切なサイズにリサイズ
+          const maxSize = 200;
+          const scale = Math.min(maxSize / img.width, maxSize / img.height);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const thumbnailBlob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob(
+              (blob) => resolve(blob || new Blob([])),
+              "image/jpeg",
+              0.5
+            );
+          });
+
+          const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+
+          // キャッシュに保存
+          const receiptId = uuidv4();
+          sessionStorage.setItem(
+            `thumbnail_${receiptId}`,
+            await blobToBase64(thumbnailBlob)
+          );
+
           results.push({
-            id: uuidv4(),
-            imageUrls: [imageUrl], // 配列として保存
+            id: receiptId,
+            imageUrls: [imageUrl],
             pdfUrl,
-            date: "", // 日付を空に変更
-            updatedAt: today, // 更新日を追加
+            thumbnailUrl, // 一時的なURL（表示用）
+            date: "",
+            updatedAt: today,
             vendor: "",
             amount: 0,
-            type: "領収書", // デフォルト値
+            type: "領収書",
             memo: "",
             tag: "",
             status: "完了",
@@ -291,6 +425,9 @@ export function usePdfProcessing() {
     splitPdfPages,
     convertImageToPdf,
     mergePdfs,
+    generateThumbnail,
+    createThumbnailUrl,
+    blobToBase64,
     isProcessing,
     error,
   };

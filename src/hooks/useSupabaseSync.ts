@@ -48,6 +48,7 @@ export function useSupabaseSync() {
           // レシートをPDFとしてSupabaseストレージに保存
           // （実際のPDFファイルがあれば）
           let storagePath = "";
+          const thumbnailPath = "";
           let fileSize = 0;
           let pageCount = 1; // デフォルトは1ページ
 
@@ -98,6 +99,7 @@ export function useSupabaseSync() {
               pdf_name: receipt.vendor
                 ? `${receipt.vendor}_${receipt.date || "nodate"}.pdf`
                 : `receipt_${receipt.id}.pdf`,
+              thumbnail_path: thumbnailPath || null,
               type: receipt.type || "領収書",
               memo: receipt.memo || "",
               tag: receipt.tag || "",

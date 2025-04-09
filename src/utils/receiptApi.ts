@@ -288,10 +288,11 @@ export async function fetchSavedReceipts(
     const receipts = await Promise.all(
       data.map(async (item) => {
         let pdfUrl = "";
+        let thumbnailUrl = "";
 
+        // PDFのURLを取得
         if (item.pdf_path) {
           try {
-            // 重要な変更: getPublicUrlの代わりにcreateSignedUrlを使用
             const { data: signedUrlData, error: signUrlError } =
               await supabase.storage
                 .from(bucketName)
@@ -299,7 +300,6 @@ export async function fetchSavedReceipts(
 
             if (signedUrlData && !signUrlError) {
               pdfUrl = signedUrlData.signedUrl;
-              console.log(`${item.id}の署名付きURL生成成功`);
             } else {
               console.error(`${item.id}の署名付きURL生成失敗:`, signUrlError);
             }
@@ -308,11 +308,34 @@ export async function fetchSavedReceipts(
           }
         }
 
+        // サムネイルのURLを取得
+        if (item.thumbnail_path) {
+          try {
+            const { data: thumbnailData, error: thumbnailError } =
+              await supabase.storage
+                .from(bucketName)
+                .createSignedUrl(item.thumbnail_path, 60 * 60 * 24 * 7); // 1週間有効
+
+            if (thumbnailData && !thumbnailError) {
+              thumbnailUrl = thumbnailData.signedUrl;
+            } else {
+              console.error(
+                `${item.id}のサムネイルURL生成失敗:`,
+                thumbnailError
+              );
+            }
+          } catch (storageErr) {
+            console.error(`${item.id}のサムネイルエラー:`, storageErr);
+          }
+        }
+
         return {
           id: item.id,
           imageUrls: [], // 画像URLは後で追加機能で対応
           pdfUrl: pdfUrl,
           pdfPath: item.pdf_path, // PDFパスを保持
+          thumbnailPath: item.thumbnail_path,
+          thumbnailUrl: thumbnailUrl,
           date: item.date || "",
           updatedAt: item.updated_at,
           vendor: item.vendor || "",
