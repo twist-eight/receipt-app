@@ -3,6 +3,7 @@ export interface ReceiptItem {
   id: string;
   imageUrls: string[]; // Changed from imageUrl to imageUrls array
   pdfUrl: string;
+  pdfPath?: string; // 追加: PDFのストレージパス
   date: string; // 領収書の日付、初期値は空に
   updatedAt: string; // 追加: 更新日時
   vendor: string;

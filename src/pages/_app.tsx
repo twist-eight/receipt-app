@@ -79,6 +79,12 @@ const HeaderComponent = () => {
             📊 Supabaseへ登録
           </Link>
           <Link
+            href="/scrapbook"
+            className="text-blue-600 hover:underline whitespace-nowrap"
+          >
+            📚 スクラップブック
+          </Link>
+          <Link
             href="/clients"
             className="text-blue-600 hover:underline whitespace-nowrap"
           >

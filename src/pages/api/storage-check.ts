@@ -78,23 +78,4 @@ export const runDetailedStorageDiagnostics = async () => {
   }
 };
 
-// 直接ストレージURLを生成するヘルパー関数
-export const getDirectStorageUrl = (
-  bucketName: string,
-  path: string
-): string => {
-  if (!supabaseUrl) return "";
-  return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
-};
-
-// ファイルサイズをB, KB, MBに変換するヘルパー関数
-export const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-};
-
-// データベース用のタイムスタンプを作成するヘルパー関数
-export const getCurrentTimestamp = (): string => {
-  return new Date().toISOString();
-};
+//

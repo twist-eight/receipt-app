@@ -89,6 +89,11 @@ export default function Home() {
             データベース登録ページへ
           </Link>
         </li>
+        <li>
+          <Link href="/scrapbook" className="text-blue-600 underline">
+            スクラップブックへ
+          </Link>
+        </li>
       </ul>
     </div>
   );
