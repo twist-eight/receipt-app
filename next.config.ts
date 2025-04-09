@@ -4,6 +4,17 @@ import type { Configuration } from "webpack";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // Supabaseのストレージドメインを許可リストに追加
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/**",
+      },
+    ],
+  },
+
   webpack(config: Configuration) {
     // config.module を初期化
     if (!config.module) {

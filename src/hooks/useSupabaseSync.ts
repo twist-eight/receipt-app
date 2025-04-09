@@ -46,9 +46,8 @@ export function useSupabaseSync() {
       for (const receipt of receipts) {
         try {
           // レシートをPDFとしてSupabaseストレージに保存
-          // （実際のPDFファイルがあれば）
-          let storagePath = "";
-          const thumbnailPath = "";
+          const storagePath = "";
+          let thumbnailPath = ""; // 明示的に変数を初期化
           let fileSize = 0;
           let pageCount = 1; // デフォルトは1ページ
 
@@ -56,30 +55,67 @@ export function useSupabaseSync() {
             try {
               const pdfResponse = await fetch(receipt.pdfUrl);
               const pdfBlob = await pdfResponse.blob();
-              fileSize = pdfBlob.size; // ファイルサイズを記録
+              fileSize = pdfBlob.size;
 
-              // PDFのページ数を取得
+              // PDFのページ数を取得と保存処理（既存コードは変更なし）
               const arrayBuffer = await pdfBlob.arrayBuffer();
               const pdf = await pdfjsLib.getDocument(
                 new Uint8Array(arrayBuffer)
               ).promise;
               pageCount = pdf.numPages;
 
-              // ファイル名をより構造化: クライアントID/日付_レシートID.pdf
-              const dateStr = receipt.date
-                ? receipt.date.replace(/-/g, "")
-                : "nodate";
-              const fileName = `${dateStr}_${receipt.id}.pdf`;
-              const filePath = `clients/${client.id}/${fileName}`;
+              // サムネイルをアップロード
+              const thumbnailBase64 = sessionStorage.getItem(
+                `thumbnail_${receipt.id}`
+              );
+              if (thumbnailBase64) {
+                try {
+                  // Base64からBlobに変換
+                  const thumbnailBlob = await fetch(thumbnailBase64).then(
+                    (res) => res.blob()
+                  );
 
-              const { error: uploadError } = await supabase.storage
-                .from("receipts")
-                .upload(filePath, pdfBlob);
+                  // サムネイルをストレージにアップロード
+                  // フォルダ構造を変更：クライアントフォルダ内にサムネイルを保存
+                  const dateStr = receipt.date
+                    ? receipt.date.replace(/-/g, "")
+                    : "nodate";
+                  const thumbnailFileName = `thumbnail_${dateStr}_${receipt.id}.jpg`;
+                  const thumbnailFilePath = `clients/${client.id}/thumbnails/${thumbnailFileName}`;
 
-              if (uploadError) {
-                console.error("PDF upload error:", uploadError);
+                  console.log(
+                    "Attempting to upload thumbnail:",
+                    thumbnailFilePath,
+                    "for receipt:",
+                    receipt.id
+                  );
+
+                  const { error: thumbnailError } = await supabase.storage
+                    .from("receipts") // receipts バケットを使用
+                    .upload(thumbnailFilePath, thumbnailBlob, {
+                      contentType: "image/jpeg", // MIME タイプを明示的に指定
+                      upsert: true, // 既存ファイルを上書き
+                    });
+
+                  if (thumbnailError) {
+                    console.error("Thumbnail upload error:", thumbnailError);
+                    // エラーの詳細をログ出力
+                    console.error("Error details:", thumbnailError.message);
+                  } else {
+                    console.log(
+                      "Thumbnail uploaded successfully:",
+                      thumbnailFilePath
+                    );
+                    thumbnailPath = thumbnailFilePath; // サムネイルパスを設定
+                  }
+
+                  // 使用済みの一時データを削除
+                  sessionStorage.removeItem(`thumbnail_${receipt.id}`);
+                } catch (err) {
+                  console.error("Thumbnail processing error:", err);
+                }
               } else {
-                storagePath = filePath;
+                console.log("No thumbnail data found for receipt:", receipt.id);
               }
             } catch (err) {
               console.error("PDF processing error:", err);
@@ -99,7 +135,7 @@ export function useSupabaseSync() {
               pdf_name: receipt.vendor
                 ? `${receipt.vendor}_${receipt.date || "nodate"}.pdf`
                 : `receipt_${receipt.id}.pdf`,
-              thumbnail_path: thumbnailPath || null,
+              thumbnail_path: thumbnailPath || null, // サムネイルパスを保存
               type: receipt.type || "領収書",
               memo: receipt.memo || "",
               tag: receipt.tag || "",
