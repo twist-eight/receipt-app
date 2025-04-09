@@ -24,7 +24,6 @@ export function useSupabaseSync() {
     failed: number;
   }>({ success: 0, failed: 0 });
 
-  // 複数の領収書を一括でSupabaseと同期
   const syncReceiptsToSupabase = async (
     receipts: ReceiptItem[],
     client: Client,
@@ -46,7 +45,7 @@ export function useSupabaseSync() {
       for (const receipt of receipts) {
         try {
           // レシートをPDFとしてSupabaseストレージに保存
-          const storagePath = "";
+          let storagePath = "";
           let thumbnailPath = ""; // 明示的に変数を初期化
           let fileSize = 0;
           let pageCount = 1; // デフォルトは1ページ
@@ -57,12 +56,41 @@ export function useSupabaseSync() {
               const pdfBlob = await pdfResponse.blob();
               fileSize = pdfBlob.size;
 
-              // PDFのページ数を取得と保存処理（既存コードは変更なし）
+              // PDFのページ数を取得
               const arrayBuffer = await pdfBlob.arrayBuffer();
               const pdf = await pdfjsLib.getDocument(
                 new Uint8Array(arrayBuffer)
               ).promise;
               pageCount = pdf.numPages;
+
+              // PDFをストレージにアップロード (追加する部分)
+              const dateStr = receipt.date
+                ? receipt.date.replace(/-/g, "")
+                : "nodate";
+              const pdfFileName = `pdf_${dateStr}_${receipt.id}.pdf`;
+              const pdfFilePath = `clients/${client.id}/pdfs/${pdfFileName}`;
+
+              console.log(
+                "Attempting to upload PDF:",
+                pdfFilePath,
+                "for receipt:",
+                receipt.id
+              );
+
+              const { error: pdfUploadError } = await supabase.storage
+                .from("receipts") // receipts バケットを使用
+                .upload(pdfFilePath, pdfBlob, {
+                  contentType: "application/pdf", // MIME タイプを明示的に指定
+                  upsert: true, // 既存ファイルを上書き
+                });
+
+              if (pdfUploadError) {
+                console.error("PDF upload error:", pdfUploadError);
+                console.error("Error details:", pdfUploadError.message);
+              } else {
+                console.log("PDF uploaded successfully:", pdfFilePath);
+                storagePath = pdfFilePath; // PDFパスを保存
+              }
 
               // サムネイルをアップロード
               const thumbnailBase64 = sessionStorage.getItem(
@@ -77,9 +105,6 @@ export function useSupabaseSync() {
 
                   // サムネイルをストレージにアップロード
                   // フォルダ構造を変更：クライアントフォルダ内にサムネイルを保存
-                  const dateStr = receipt.date
-                    ? receipt.date.replace(/-/g, "")
-                    : "nodate";
                   const thumbnailFileName = `thumbnail_${dateStr}_${receipt.id}.jpg`;
                   const thumbnailFilePath = `clients/${client.id}/thumbnails/${thumbnailFileName}`;
 

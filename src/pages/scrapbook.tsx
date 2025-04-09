@@ -19,6 +19,19 @@ export default function ScrapbookPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  // グリッドサイズ設定の状態
+  const [gridSize, setGridSize] = useState<"small" | "medium" | "large">(
+    "medium"
+  );
+  // 画像読み込み状態の管理
+  const [loadingImages, setLoadingImages] = useState<{
+    [key: string]: boolean;
+  }>({});
+  // PDFプレビューモーダルの状態
+  const [previewPdf, setPreviewPdf] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
   // 選択中の顧問先情報
   const selectedClient = selectedClientId
@@ -44,6 +57,13 @@ export default function ScrapbookPage() {
 
         if (response.success && response.data) {
           setReceipts(response.data);
+
+          // 画像の読み込み状態を初期化
+          const initialLoadingState: { [key: string]: boolean } = {};
+          response.data.forEach((receipt) => {
+            initialLoadingState[receipt.id] = true;
+          });
+          setLoadingImages(initialLoadingState);
         } else {
           setError(response.error || "データの取得に失敗しました");
         }
@@ -63,12 +83,43 @@ export default function ScrapbookPage() {
   }, [selectedClientId, sortOrder, startDate, endDate, selectedType]);
 
   // PDFを開く処理
-  const handleOpenPdf = (pdfUrl: string) => {
+  const handleOpenPdf = (pdfUrl: string, vendor?: string) => {
     if (pdfUrl) {
-      window.open(pdfUrl, "_blank");
+      // プレビューモーダルを表示
+      setPreviewPdf({
+        url: pdfUrl,
+        title: vendor || "ドキュメント",
+      });
     } else {
       setError("PDFが見つかりません");
     }
+  };
+
+  // 新規タブでPDFを開く
+  const openPdfInNewTab = (pdfUrl: string) => {
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank");
+      // モーダルを閉じる
+      setPreviewPdf(null);
+    } else {
+      setError("PDFが見つかりません");
+    }
+  };
+
+  // 画像読み込み完了時の処理
+  const handleImageLoaded = (id: string) => {
+    setLoadingImages((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
+  };
+
+  // 画像読み込みエラー時の処理
+  const handleImageError = (id: string) => {
+    setLoadingImages((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
   };
 
   // 授受区分でフィルタリングする
@@ -152,6 +203,34 @@ export default function ScrapbookPage() {
     }
   };
 
+  // カードサイズに応じたグリッドクラスを返す関数
+  const getGridSizeClass = () => {
+    switch (gridSize) {
+      case "small":
+        return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6";
+      case "medium":
+        return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+      case "large":
+        return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3";
+      default:
+        return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+    }
+  };
+
+  // カードサイズに応じた高さクラスを返す関数
+  const getCardHeightClass = () => {
+    switch (gridSize) {
+      case "small":
+        return "h-36";
+      case "medium":
+        return "h-48";
+      case "large":
+        return "h-64";
+      default:
+        return "h-48";
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">スクラップブック</h1>
@@ -173,7 +252,7 @@ export default function ScrapbookPage() {
         </div>
       )}
 
-      {/* フィルタと並び順 */}
+      {/* フィルターと表示オプション */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -184,7 +263,7 @@ export default function ScrapbookPage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
@@ -195,7 +274,7 @@ export default function ScrapbookPage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
@@ -205,7 +284,7 @@ export default function ScrapbookPage() {
             <select
               value={selectedType || ""}
               onChange={(e) => setSelectedType(e.target.value || null)}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">すべて</option>
               <option value="領収書">領収書</option>
@@ -266,7 +345,8 @@ export default function ScrapbookPage() {
           </div>
         </div>
 
-        <div className="flex justify-between mt-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-3">
+          {/* フィルタリセットボタン */}
           <button
             onClick={() => {
               setStartDate("");
@@ -274,32 +354,75 @@ export default function ScrapbookPage() {
               setSelectedType(null);
               setSelectedTransferType(null);
             }}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
           >
             フィルタをクリア
           </button>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm">並び順:</span>
-            <button
-              onClick={() => setSortOrder("desc")}
-              className={`px-3 py-1 rounded ${
-                sortOrder === "desc"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              新しい順
-            </button>
-            <button
-              onClick={() => setSortOrder("asc")}
-              className={`px-3 py-1 rounded ${
-                sortOrder === "asc"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              古い順
-            </button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* 表示サイズ切替 */}
+            <div className="flex items-center">
+              <span className="text-sm mr-2">表示サイズ:</span>
+              <div className="flex border rounded overflow-hidden">
+                <button
+                  onClick={() => setGridSize("small")}
+                  className={`px-2 py-1 text-xs ${
+                    gridSize === "small"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  小
+                </button>
+                <button
+                  onClick={() => setGridSize("medium")}
+                  className={`px-2 py-1 text-xs ${
+                    gridSize === "medium"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  中
+                </button>
+                <button
+                  onClick={() => setGridSize("large")}
+                  className={`px-2 py-1 text-xs ${
+                    gridSize === "large"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  大
+                </button>
+              </div>
+            </div>
+
+            {/* 並び順切替 */}
+            <div className="flex items-center">
+              <span className="text-sm mr-2">並び順:</span>
+              <div className="flex border rounded overflow-hidden">
+                <button
+                  onClick={() => setSortOrder("desc")}
+                  className={`px-3 py-1 ${
+                    sortOrder === "desc"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  新しい順
+                </button>
+                <button
+                  onClick={() => setSortOrder("asc")}
+                  className={`px-3 py-1 ${
+                    sortOrder === "asc"
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  古い順
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -308,6 +431,9 @@ export default function ScrapbookPage() {
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
           {error}
+          <button onClick={() => setError(null)} className="ml-2 font-bold">
+            ×
+          </button>
         </div>
       )}
 
@@ -323,7 +449,7 @@ export default function ScrapbookPage() {
           </p>
           <Link
             href="/upload"
-            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
           >
             アップロードページへ
           </Link>
@@ -336,20 +462,29 @@ export default function ScrapbookPage() {
               key={group.monthKey}
               className="bg-white rounded-lg shadow-md overflow-hidden"
             >
-              <h2 className="bg-gray-100 p-3 font-medium text-lg">
+              <h2 className="bg-gray-50 p-3 font-medium text-lg border-b">
                 {formatMonthDisplay(group.monthKey)}
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+              <div className={`grid ${getGridSizeClass()} gap-4 p-4`}>
                 {group.receipts.map((receipt) => (
                   <div
                     key={receipt.id}
-                    className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
                   >
                     {/* 画像表示部分 */}
                     <div
-                      className="h-40 bg-gray-50 cursor-pointer relative"
-                      onClick={() => handleOpenPdf(receipt.pdfUrl)}
+                      className={`${getCardHeightClass()} bg-gray-50 cursor-pointer relative`}
+                      onClick={() =>
+                        handleOpenPdf(receipt.pdfUrl, receipt.vendor)
+                      }
                     >
+                      {/* 読み込み中表示 */}
+                      {loadingImages[receipt.id] && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75 z-10">
+                          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+
                       {receipt.thumbnailUrl ? (
                         <div className="h-full w-full flex items-center justify-center overflow-hidden relative">
                           <Image
@@ -357,15 +492,38 @@ export default function ScrapbookPage() {
                             alt={receipt.vendor || "レシート"}
                             fill
                             sizes="(max-width: 768px) 100vw, 25vw"
-                            className="object-contain"
-                            onError={(e) => {
-                              // エラー時はプレースホルダーを表示
-                              const imgElement = e.target as HTMLImageElement;
-                              imgElement.onerror = null; // 無限ループ防止
-                              imgElement.src =
-                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'%3E%3C/path%3E%3C/svg%3E";
-                            }}
+                            className="object-contain transition duration-200 group-hover:scale-105"
+                            onLoadingComplete={() =>
+                              handleImageLoaded(receipt.id)
+                            }
+                            onError={() => handleImageError(receipt.id)}
                           />
+
+                          {/* PDFアイコンオーバーレイ */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-30">
+                            <div className="bg-white p-2 rounded-full shadow-md">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6 text-blue-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div className="h-full flex items-center justify-center bg-gray-100">
@@ -385,57 +543,16 @@ export default function ScrapbookPage() {
                           </svg>
                         </div>
                       )}
-                      {/* 授受区分アイコンを左上に表示 */}
-                      <div
-                        className="h-40 bg-gray-50 cursor-pointer relative"
-                        onClick={() => handleOpenPdf(receipt.pdfUrl)}
-                      >
-                        {receipt.thumbnailUrl ? (
-                          <div className="h-full w-full flex items-center justify-center overflow-hidden">
-                            <Image
-                              src={receipt.thumbnailUrl}
-                              alt={receipt.vendor || "レシート"}
-                              fill
-                              sizes="(max-width: 768px) 100vw, 25vw"
-                              className="object-contain"
-                              onError={(e) => {
-                                // エラー時はプレースホルダーを表示
-                                const imgElement = e.target as HTMLImageElement;
-                                imgElement.onerror = null; // 無限ループ防止
-                                imgElement.src =
-                                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'%3E%3C/path%3E%3C/svg%3E";
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-full flex items-center justify-center bg-gray-100">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-12 w-12 text-gray-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                          </div>
-                        )}
 
-                        {/* 授受区分アイコンを左上に表示（変更なし） */}
-                        <div className="absolute top-2 left-2">
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full text-xs ${getTransferTypeStyle(
-                              receipt.transferType
-                            )}`}
-                          >
-                            {receipt.transferType || "未設定"}
-                          </span>
-                        </div>
+                      {/* 授受区分アイコンを左上に表示 */}
+                      <div className="absolute top-2 left-2">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs ${getTransferTypeStyle(
+                            receipt.transferType
+                          )}`}
+                        >
+                          {receipt.transferType || "未設定"}
+                        </span>
                       </div>
                     </div>
 
@@ -448,7 +565,7 @@ export default function ScrapbookPage() {
                         >
                           {receipt.vendor || "未設定"}
                         </h3>
-                        <span className="text-sm text-blue-600">
+                        <span className="text-sm text-blue-600 font-semibold whitespace-nowrap ml-1">
                           {receipt.amount
                             ? `¥${receipt.amount.toLocaleString()}`
                             : "¥0"}
@@ -480,11 +597,25 @@ export default function ScrapbookPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleOpenPdf(receipt.pdfUrl);
+                          handleOpenPdf(receipt.pdfUrl, receipt.vendor);
                         }}
-                        className="mt-2 text-xs text-blue-600 hover:underline w-full text-center"
+                        className="mt-2 text-xs text-white bg-blue-500 hover:bg-blue-600 py-1 px-3 rounded transition-colors w-full text-center flex items-center justify-center"
                       >
-                        PDFを開く
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 mr-1"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                          />
+                        </svg>
+                        PDFを表示
                       </button>
                     </div>
                   </div>
@@ -492,6 +623,72 @@ export default function ScrapbookPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* PDF表示モーダル */}
+      {previewPdf && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewPdf(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="font-medium text-lg truncate">
+                {previewPdf.title}
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openPdfInNewTab(previewPdf.url)}
+                  className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setPreviewPdf(null)}
+                  className="text-gray-600 hover:text-gray-800 px-3 py-1 rounded hover:bg-gray-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={previewPdf.url}
+                className="w-full h-full border-0"
+                title={`PDF Preview: ${previewPdf.title}`}
+              />
+            </div>
+          </div>
         </div>
       )}
 
