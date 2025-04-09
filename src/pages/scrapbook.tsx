@@ -1,5 +1,5 @@
 // src/pages/scrapbook.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useClientContext } from "../contexts/ClientContext";
 import { fetchSavedReceipts } from "../utils/receiptApi";
@@ -27,11 +27,8 @@ export default function ScrapbookPage() {
   const [loadingImages, setLoadingImages] = useState<{
     [key: string]: boolean;
   }>({});
-  // PDFプレビューモーダルの状態
-  const [previewPdf, setPreviewPdf] = useState<{
-    url: string;
-    title: string;
-  } | null>(null);
+  // 検索用の状態
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // 選択中の顧問先情報
   const selectedClient = selectedClientId
@@ -82,25 +79,10 @@ export default function ScrapbookPage() {
     loadSavedReceipts();
   }, [selectedClientId, sortOrder, startDate, endDate, selectedType]);
 
-  // PDFを開く処理
-  const handleOpenPdf = (pdfUrl: string, vendor?: string) => {
-    if (pdfUrl) {
-      // プレビューモーダルを表示
-      setPreviewPdf({
-        url: pdfUrl,
-        title: vendor || "ドキュメント",
-      });
-    } else {
-      setError("PDFが見つかりません");
-    }
-  };
-
-  // 新規タブでPDFを開く
-  const openPdfInNewTab = (pdfUrl: string) => {
+  // PDFを開く処理 - 修正：直接新しいタブで開く
+  const handleOpenPdf = (pdfUrl: string) => {
     if (pdfUrl) {
       window.open(pdfUrl, "_blank");
-      // モーダルを閉じる
-      setPreviewPdf(null);
     } else {
       setError("PDFが見つかりません");
     }
@@ -123,13 +105,35 @@ export default function ScrapbookPage() {
   };
 
   // 授受区分でフィルタリングする
-  const filteredByTransferType = selectedTransferType
-    ? receipts.filter(
-        (receipt) => receipt.transferType === selectedTransferType
-      )
-    : receipts;
+  const filteredReceipts = useMemo(() => {
+    let filtered = receipts;
 
-  // 月ごとにレシートをグループ化する関数
+    // 授受区分フィルター
+    if (selectedTransferType) {
+      filtered = filtered.filter(
+        (receipt) => receipt.transferType === selectedTransferType
+      );
+    }
+
+    // 検索クエリフィルター
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (receipt) =>
+          (receipt.vendor && receipt.vendor.toLowerCase().includes(query)) ||
+          (receipt.memo && receipt.memo.toLowerCase().includes(query)) ||
+          (receipt.tag && receipt.tag.toLowerCase().includes(query)) ||
+          (receipt.type && receipt.type.toLowerCase().includes(query)) ||
+          (receipt.subType && receipt.subType.toLowerCase().includes(query)) ||
+          (receipt.amount && receipt.amount.toString().includes(query)) ||
+          (receipt.date && receipt.date.includes(query))
+      );
+    }
+
+    return filtered;
+  }, [receipts, selectedTransferType, searchQuery]);
+
+  // 月ごとにレシートをグループ化する関数（グループ内で日付順に並べる）
   const groupReceiptsByMonth = (receipts: ReceiptItem[]) => {
     const groups: { [key: string]: ReceiptItem[] } = {};
 
@@ -146,19 +150,26 @@ export default function ScrapbookPage() {
       groups[monthKey].push(receipt);
     });
 
-    // 日付キー順にソート
+    // 月ごとのグループをソート
     const sortedKeys = Object.keys(groups).sort((a, b) => {
       return sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b);
     });
 
+    // 各グループ内で日付順にソート
     return sortedKeys.map((key) => ({
       monthKey: key,
-      receipts: groups[key],
+      receipts: groups[key].sort((a, b) => {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return sortOrder === "desc"
+          ? b.date.localeCompare(a.date)
+          : a.date.localeCompare(b.date);
+      }),
     }));
   };
 
   // レシートを月別にグループ化
-  const groupedReceipts = groupReceiptsByMonth(filteredByTransferType);
+  const groupedReceipts = groupReceiptsByMonth(filteredReceipts);
 
   // 月名表示用のフォーマット関数
   const formatMonthDisplay = (monthKey: string) => {
@@ -251,6 +262,53 @@ export default function ScrapbookPage() {
           </Link>
         </div>
       )}
+
+      {/* 検索フォーム */}
+      <div className="mb-4">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="取引先、メモ、タグなどで検索..."
+            className="w-full p-3 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+          />
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg
+              className="h-5 w-5 text-gray-400"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          {searchQuery && (
+            <button
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              onClick={() => setSearchQuery("")}
+            >
+              <svg
+                className="h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* フィルターと表示オプション */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
@@ -353,6 +411,7 @@ export default function ScrapbookPage() {
               setEndDate("");
               setSelectedType(null);
               setSelectedTransferType(null);
+              setSearchQuery("");
             }}
             className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
           >
@@ -454,6 +513,22 @@ export default function ScrapbookPage() {
             アップロードページへ
           </Link>
         </div>
+      ) : filteredReceipts.length === 0 ? (
+        <div className="bg-yellow-50 p-8 text-center rounded-lg my-6">
+          <p className="text-yellow-700 mb-4">
+            検索条件に一致するデータが見つかりませんでした。
+          </p>
+          <button
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedType(null);
+              setSelectedTransferType(null);
+            }}
+            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+          >
+            検索条件をクリア
+          </button>
+        </div>
       ) : (
         // 月別グループでレシートを表示
         <div className="space-y-8">
@@ -464,19 +539,20 @@ export default function ScrapbookPage() {
             >
               <h2 className="bg-gray-50 p-3 font-medium text-lg border-b">
                 {formatMonthDisplay(group.monthKey)}
+                <span className="text-sm text-gray-500 ml-2">
+                  ({group.receipts.length}件)
+                </span>
               </h2>
               <div className={`grid ${getGridSizeClass()} gap-4 p-4`}>
                 {group.receipts.map((receipt) => (
                   <div
                     key={receipt.id}
-                    className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                    className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                   >
                     {/* 画像表示部分 */}
                     <div
-                      className={`${getCardHeightClass()} bg-gray-50 cursor-pointer relative`}
-                      onClick={() =>
-                        handleOpenPdf(receipt.pdfUrl, receipt.vendor)
-                      }
+                      className={`${getCardHeightClass()} bg-gray-50 cursor-pointer relative group`}
+                      onClick={() => handleOpenPdf(receipt.pdfUrl)}
                     >
                       {/* 読み込み中表示 */}
                       {loadingImages[receipt.id] && (
@@ -492,16 +568,16 @@ export default function ScrapbookPage() {
                             alt={receipt.vendor || "レシート"}
                             fill
                             sizes="(max-width: 768px) 100vw, 25vw"
-                            className="object-contain transition duration-200 group-hover:scale-105"
+                            className="object-contain transition duration-300 group-hover:scale-105"
                             onLoadingComplete={() =>
                               handleImageLoaded(receipt.id)
                             }
                             onError={() => handleImageError(receipt.id)}
                           />
 
-                          {/* PDFアイコンオーバーレイ */}
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-30">
-                            <div className="bg-white p-2 rounded-full shadow-md">
+                          {/* 改善されたマウスオーバーエフェクト - ぼかし効果 */}
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm bg-white/30 flex items-center justify-center">
+                            <div className="bg-white rounded-full p-3 shadow-lg transform transition duration-300 group-hover:scale-110">
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-6 w-6 text-blue-600"
@@ -513,13 +589,7 @@ export default function ScrapbookPage() {
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                                 />
                               </svg>
                             </div>
@@ -544,10 +614,17 @@ export default function ScrapbookPage() {
                         </div>
                       )}
 
+                      {/* 日付表示を追加 - 右上に配置 */}
+                      <div className="absolute top-2 right-2">
+                        <span className="bg-white/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium shadow-sm">
+                          {formatDateDisplay(receipt.date)}
+                        </span>
+                      </div>
+
                       {/* 授受区分アイコンを左上に表示 */}
                       <div className="absolute top-2 left-2">
                         <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs ${getTransferTypeStyle(
+                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getTransferTypeStyle(
                             receipt.transferType
                           )}`}
                         >
@@ -556,67 +633,46 @@ export default function ScrapbookPage() {
                       </div>
                     </div>
 
-                    {/* レシート情報 */}
+                    {/* レシート情報 - 改善されたレイアウト */}
                     <div className="p-3">
-                      <div className="flex justify-between items-start mb-1">
+                      <div className="flex justify-between items-start mb-2">
                         <h3
-                          className="font-medium truncate"
+                          className="font-medium truncate text-blue-700"
                           title={receipt.vendor}
                         >
                           {receipt.vendor || "未設定"}
                         </h3>
-                        <span className="text-sm text-blue-600 font-semibold whitespace-nowrap ml-1">
+                        <span className="text-sm font-bold whitespace-nowrap ml-1 bg-blue-50 px-2 py-0.5 rounded">
                           {receipt.amount
                             ? `¥${receipt.amount.toLocaleString()}`
                             : "¥0"}
                         </span>
                       </div>
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>{formatDateDisplay(receipt.date)}</span>
-                        <span className="px-1.5 py-0.5 bg-gray-100 rounded">
+
+                      <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                        <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-medium">
                           {receipt.type}
-                          {receipt.subType && ` (${receipt.subType})`}
                         </span>
-                      </div>
-                      {receipt.tag && (
-                        <div className="mt-1">
-                          <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                        {receipt.subType && (
+                          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
+                            {receipt.subType}
+                          </span>
+                        )}
+                        {receipt.tag && (
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
                             {receipt.tag}
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
+
                       {receipt.memo && (
                         <p
-                          className="mt-1 text-xs text-gray-600 truncate"
+                          className="mt-1 text-xs text-gray-600 line-clamp-2"
                           title={receipt.memo}
                         >
                           {receipt.memo}
                         </p>
                       )}
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenPdf(receipt.pdfUrl, receipt.vendor);
-                        }}
-                        className="mt-2 text-xs text-white bg-blue-500 hover:bg-blue-600 py-1 px-3 rounded transition-colors w-full text-center flex items-center justify-center"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 mr-1"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                          />
-                        </svg>
-                        PDFを表示
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -626,79 +682,14 @@ export default function ScrapbookPage() {
         </div>
       )}
 
-      {/* PDF表示モーダル */}
-      {previewPdf && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setPreviewPdf(null)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="font-medium text-lg truncate">
-                {previewPdf.title}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openPdfInNewTab(previewPdf.url)}
-                  className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setPreviewPdf(null)}
-                  className="text-gray-600 hover:text-gray-800 px-3 py-1 rounded hover:bg-gray-50"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <iframe
-                src={previewPdf.url}
-                className="w-full h-full border-0"
-                title={`PDF Preview: ${previewPdf.title}`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 表示データ統計 */}
-      {!isLoading && filteredByTransferType.length > 0 && (
+      {!isLoading && filteredReceipts.length > 0 && (
         <div className="mt-6 bg-gray-100 p-3 rounded-md">
           <p className="text-sm text-gray-600">
-            表示中: {filteredByTransferType.length}件
+            表示中: {filteredReceipts.length}件
             {selectedTransferType && `（授受区分: ${selectedTransferType}）`}
             {selectedType && `（種類: ${selectedType}）`}
+            {searchQuery && `（検索: "${searchQuery}"）`}
           </p>
         </div>
       )}
