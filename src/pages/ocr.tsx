@@ -6,8 +6,8 @@ import { useClientContext } from "../contexts/ClientContext";
 import ImageCarousel from "../components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ReceiptType } from "../types/receipt";
-// useOcrのインポートを追加（必要な場合）
-// import { useOcr } from "../hooks/useOcr";
+// useOcrフックをインポート
+import { useOcr } from "../hooks/useOcr";
 
 export default function OcrPage() {
   const router = useRouter();
@@ -19,6 +19,14 @@ export default function OcrPage() {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+
+  // useOcrフックを使用 - 未使用の変数を削除
+  const {
+    processMultipleReceipts,
+    isProcessing: ocrIsProcessing,
+    processedCount: ocrProcessedCount,
+    error: ocrError,
+  } = useOcr();
 
   // 初期化フラグを追加
   const initializedRef = useRef(false);
@@ -58,6 +66,21 @@ export default function OcrPage() {
     const docType = selectedClient.documentTypes.find((dt) => dt.type === type);
     return docType ? docType.subTypes : [];
   };
+
+  // OCRの処理状態を監視して表示に反映
+  useEffect(() => {
+    if (ocrIsProcessing) {
+      setIsProcessing(true);
+      setProcessedCount(ocrProcessedCount);
+    } else if (isProcessing && !ocrIsProcessing) {
+      // OCR処理が完了したら状態を更新
+      setIsProcessing(false);
+    }
+
+    if (ocrError) {
+      setError(ocrError);
+    }
+  }, [ocrIsProcessing, ocrProcessedCount, ocrError, isProcessing]);
 
   // 初期化時「だけ」に全てのアイテムを選択状態にする
   useEffect(() => {
@@ -123,15 +146,13 @@ export default function OcrPage() {
     }
   };
 
-  // OCR実行の処理
+  // OCR実行の処理を修正
   const runOcr = async () => {
     if (selectedIds.length === 0) {
       setError("処理するアイテムを選択してください");
       return;
     }
 
-    setIsProcessing(true);
-    setProcessedCount(0);
     setError(null);
 
     try {
@@ -140,19 +161,26 @@ export default function OcrPage() {
         selectedIds.includes(item.id)
       );
 
-      // OCR処理のシミュレーション
-      for (let i = 0; i < selectedItems.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        setProcessedCount(i + 1);
+      // OCR処理を実行（本物のAPIを使用）
+      await processMultipleReceipts(selectedItems);
+
+      // 注意: OCR結果の自動適用は無効化しています
+      // 必要な場合は以下のコメントを解除し、ocrResults と applyOcrResults を
+      // useOcr からのデストラクチャリングに追加してください
+      /*
+      for (const receiptId of selectedIds) {
+        if (ocrResults[receiptId]) {
+          const updates = applyOcrResults(receiptId, ocrResults[receiptId]);
+          updateReceipt(receiptId, updates);
+        }
       }
+      */
 
       // 処理完了後、レビューページへ
       router.push("/review");
     } catch (err) {
       console.error("OCR処理中にエラーが発生:", err);
       setError("OCR処理中にエラーが発生しました");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
