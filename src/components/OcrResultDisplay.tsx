@@ -1,14 +1,20 @@
+// src/components/OcrResultDisplay.tsx
 import React from "react";
 import { OCRResult } from "../utils/ocrService";
+import Image from "next/image";
 
 interface OcrResultDisplayProps {
   result: OCRResult;
+  thumbnailUrl?: string; // サムネイル表示用のURL (追加)
   className?: string;
+  onApply?: () => void; // 結果適用ボタン用 (追加)
 }
 
 const OcrResultDisplay: React.FC<OcrResultDisplayProps> = ({
   result,
+  thumbnailUrl,
   className = "",
+  onApply,
 }) => {
   // 信頼度に基づいて色を決定
   const getConfidenceColor = (confidence: number) => {
@@ -29,6 +35,20 @@ const OcrResultDisplay: React.FC<OcrResultDisplayProps> = ({
           信頼度: {Math.round(result.confidence * 100)}%
         </span>
       </div>
+
+      {/* サムネイル表示部分を追加 */}
+      {thumbnailUrl && (
+        <div className="mb-4 flex justify-center">
+          <div className="relative h-40 w-40 border rounded overflow-hidden">
+            <Image
+              src={thumbnailUrl}
+              alt="ドキュメントのサムネイル"
+              fill
+              className="object-contain"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         {result.vendor && (
@@ -78,6 +98,18 @@ const OcrResultDisplay: React.FC<OcrResultDisplayProps> = ({
           <div className="bg-gray-50 p-2 rounded text-sm font-mono whitespace-pre-wrap border border-gray-200">
             {result.text}
           </div>
+        </div>
+      )}
+
+      {/* 結果適用ボタンを追加 */}
+      {onApply && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onApply}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            この結果を適用
+          </button>
         </div>
       )}
     </div>

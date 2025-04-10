@@ -1,6 +1,4 @@
 // src/hooks/useOcr.ts
-// 既に削除されている processMultipleReceipts を再追加します
-
 import { useState } from "react";
 import {
   processImageWithOCR,
@@ -19,6 +17,7 @@ interface UseOcrReturn {
     receiptId: string,
     results: OCRResult
   ) => Partial<ReceiptItem>;
+  generateThumbnail: (imageUrl: string) => Promise<string>;
   isProcessing: boolean;
   processedCount: number;
   totalCount: number;
@@ -33,7 +32,7 @@ export function useOcr(): UseOcrReturn {
   const [ocrResults, setOcrResults] = useState<Record<string, OCRResult>>({});
   const [error, setError] = useState<string | null>(null);
 
-  // OCR処理を実行する関数
+  // OCR処理を実行する関数 - この関数を追加
   const runOcr = async (receipt: ReceiptItem, options: OCROptions = {}) => {
     if (!receipt.imageUrls || receipt.imageUrls.length === 0) {
       setError("OCR処理に必要な画像がありません");
@@ -56,6 +55,14 @@ export function useOcr(): UseOcrReturn {
         ...prev,
         [receipt.id]: results,
       }));
+
+      // サムネイル生成と保存
+      if (!receipt.thumbnailUrl) {
+        const thumbnailUrl = await generateThumbnail(imageUrl);
+        if (thumbnailUrl) {
+          sessionStorage.setItem(`thumbnail_${receipt.id}`, thumbnailUrl);
+        }
+      }
     } catch (err) {
       console.error("OCR処理中にエラーが発生しました:", err);
       setError(err instanceof Error ? err.message : "OCR処理に失敗しました");
@@ -64,7 +71,47 @@ export function useOcr(): UseOcrReturn {
     }
   };
 
-  // 複数の受領書を処理する関数を追加
+  // サムネイル生成関数
+  const generateThumbnail = async (imageUrl: string): Promise<string> => {
+    try {
+      if (!imageUrl) {
+        throw new Error("画像URLが指定されていません");
+      }
+
+      // 画像をロード
+      const img = new Image();
+      img.src = imageUrl;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+      });
+
+      // キャンバスに描画してサイズを調整
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        throw new Error("Canvas 2D contextの取得に失敗しました");
+      }
+
+      // 適切なサイズにリサイズ
+      const maxSize = 200;
+      const scale = Math.min(maxSize / img.width, maxSize / img.height);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // DataURLとして返す
+      return canvas.toDataURL("image/jpeg", 0.7);
+    } catch (err) {
+      console.error("サムネイル生成エラー:", err);
+      setError("サムネイルの生成に失敗しました");
+      return "";
+    }
+  };
+
+  // 複数の受領書を処理する関数
   const processMultipleReceipts = async (
     receipts: ReceiptItem[],
     options: OCROptions = {}
@@ -94,10 +141,24 @@ export function useOcr(): UseOcrReturn {
 
         try {
           const imageUrl = receipt.imageUrls[0];
+
+          // OCR処理を実行
           const result = await processImageWithOCR(imageUrl, {
             documentType: receipt.type,
             ...options,
           });
+
+          // サムネイルを生成して保存
+          if (!receipt.thumbnailUrl) {
+            const thumbnailUrl = await generateThumbnail(imageUrl);
+            if (thumbnailUrl) {
+              // サムネイルを保存
+              sessionStorage.setItem(`thumbnail_${receipt.id}`, thumbnailUrl);
+
+              // レシートオブジェクトを更新
+              receipt.thumbnailUrl = thumbnailUrl;
+            }
+          }
 
           newResults[receipt.id] = result;
           setProcessedCount(i + 1);
@@ -129,7 +190,7 @@ export function useOcr(): UseOcrReturn {
     }
   };
 
-  // OCR結果から更新データを作成
+  // OCR結果から更新データを作成 - この関数を追加
   const applyOcrResults = (
     receiptId: string,
     results: OCRResult
@@ -162,6 +223,7 @@ export function useOcr(): UseOcrReturn {
     runOcr,
     processMultipleReceipts,
     applyOcrResults,
+    generateThumbnail,
     isProcessing,
     processedCount,
     totalCount,
