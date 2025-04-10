@@ -67,6 +67,12 @@ const HeaderComponent = () => {
             🔍 OCR実行
           </Link>
           <Link
+            href="/ocr-settings"
+            className="text-blue-600 hover:underline whitespace-nowrap"
+          >
+            ⚙️ OCR設定
+          </Link>
+          <Link
             href="/review"
             className="text-blue-600 hover:underline whitespace-nowrap"
           >

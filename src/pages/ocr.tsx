@@ -6,6 +6,8 @@ import { useClientContext } from "../contexts/ClientContext";
 import ImageCarousel from "../components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ReceiptType } from "../types/receipt";
+// useOcrのインポートを追加（必要な場合）
+// import { useOcr } from "../hooks/useOcr";
 
 export default function OcrPage() {
   const router = useRouter();
@@ -384,6 +386,28 @@ export default function OcrPage() {
           >
             グループ化ページへ
           </button>
+        </div>
+      )}
+
+      {/* OCR処理中のプログレスバー（処理中のみ表示） */}
+      {isProcessing && (
+        <div className="fixed top-0 left-0 w-full z-50 bg-white shadow-md p-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium">OCR処理中...</h3>
+              <span className="text-sm text-gray-600">
+                {processedCount}/{selectedIds.length} 完了
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full"
+                style={{
+                  width: `${(processedCount / selectedIds.length) * 100}%`,
+                }}
+              ></div>
+            </div>
+          </div>
         </div>
       )}
 
