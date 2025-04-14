@@ -10,7 +10,7 @@ export function useThumbnails() {
    */
   const generateImageThumbnail = async (
     imageUrl: string,
-    maxSize = 200
+    maxSize = 400 // 200から400に変更
   ): Promise<string> => {
     try {
       setIsGenerating(true);
@@ -53,6 +53,10 @@ export function useThumbnails() {
       canvas.width = width;
       canvas.height = height;
 
+      // 高品質描画の設定
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
       // 背景を白で塗りつぶす
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -60,8 +64,8 @@ export function useThumbnails() {
       // 画像を描画
       ctx.drawImage(img, 0, 0, width, height);
 
-      // JPEG形式で圧縮して返す（品質0.7）
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+      // JPEG形式で圧縮して返す（品質0.7 → 0.85）
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       return dataUrl;
     } catch (err) {
       console.error("サムネイル生成エラー:", err);

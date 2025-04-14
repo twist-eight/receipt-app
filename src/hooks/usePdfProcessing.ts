@@ -215,19 +215,18 @@ export function usePdfProcessing() {
   };
 
   // PDFからサムネイルを生成する関数（Blob形式で返す）
-  // src/hooks/usePdfProcessing.ts - generateThumbnail関数を修正
   const generateThumbnail = async (
     pdfData: Uint8Array,
-    maxWidth = 200,
-    maxHeight = 200
+    maxWidth = 400, // 200から400に増加
+    maxHeight = 400 // 200から400に増加
   ): Promise<Blob> => {
     try {
-      // PDFの最初のページを低解像度でレンダリング
+      // PDFの最初のページを高解像度でレンダリング
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(1); // 最初のページのみ使用
 
       // 元のページビューポートを取得
-      const viewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: 1.5 }); // スケールを1.0→1.5に上げて高解像度に
 
       // アスペクト比を計算
       const aspectRatio = viewport.width / viewport.height;
@@ -262,17 +261,21 @@ export function usePdfProcessing() {
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
 
+      // 高品質レンダリングを設定
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+
       await page.render({ canvasContext: context, viewport: scaledViewport })
         .promise;
 
-      // JPEG形式でBlobとして返す
+      // JPEG形式でBlobとして返す - 品質を0.5→0.85に上げる
       return new Promise<Blob>((resolve) => {
         canvas.toBlob(
           (blob) => {
             resolve(blob || new Blob([]));
           },
           "image/jpeg",
-          0.5
+          0.85 // 品質を大幅に上げる
         );
       });
     } catch (err) {
@@ -403,18 +406,27 @@ export function usePdfProcessing() {
           const ctx = canvas.getContext("2d");
 
           // 適切なサイズにリサイズ
-          const maxSize = 200;
+          const maxSize = 400;
           const scale = Math.min(maxSize / img.width, maxSize / img.height);
           canvas.width = img.width * scale;
           canvas.height = img.height * scale;
 
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // 高品質描画の設定
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
 
+            // 背景を白で塗りつぶす（透明画像対応）
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          }
           const thumbnailBlob = await new Promise<Blob>((resolve) => {
             canvas.toBlob(
               (blob) => resolve(blob || new Blob([])),
               "image/jpeg",
-              0.5
+              0.85
             );
           });
 
