@@ -80,8 +80,6 @@ export default function GroupPage() {
   };
 
   // グループ化処理
-  // 既存のコードをそのまま使用
-
   const handleCreateGroup = async () => {
     if (selectedIds.length < 2) {
       setError("グループ化するには2つ以上のアイテムを選択してください");
@@ -95,7 +93,10 @@ export default function GroupPage() {
         selectedIds.includes(item.id)
       );
       const pdfUrls = selectedItems.map((item) => item.pdfUrl);
-      const { mergedPdfUrl, mergedImageUrls } = await mergePdfs(pdfUrls);
+
+      // 修正: thumbnailDataUrlを受け取るように変更
+      const { mergedPdfUrl, mergedImageUrls, thumbnailDataUrl } =
+        await mergePdfs(pdfUrls);
 
       // 新しいグループアイテムを作成
       const newGroupItem: ReceiptItem = {
@@ -114,6 +115,17 @@ export default function GroupPage() {
         tag: selectedItems[0].tag,
         status: selectedItems[0].status,
       };
+
+      // 追加: サムネイルをセッションストレージに保存
+      if (thumbnailDataUrl) {
+        sessionStorage.setItem(
+          `thumbnail_${newGroupItem.id}`,
+          thumbnailDataUrl
+        );
+        console.log(
+          `グループアイテム ${newGroupItem.id} のサムネイルを保存しました`
+        );
+      }
 
       // 元のアイテムを削除
       selectedIds.forEach((id) => {

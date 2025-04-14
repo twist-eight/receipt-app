@@ -187,7 +187,11 @@ export function usePdfProcessing() {
   // PDFをマージする関数
   const mergePdfs = async (
     pdfUrls: string[]
-  ): Promise<{ mergedPdfUrl: string; mergedImageUrls: string[] }> => {
+  ): Promise<{
+    mergedPdfUrl: string;
+    mergedImageUrls: string[];
+    thumbnailDataUrl?: string;
+  }> => {
     if (pdfUrls.length < 2) {
       throw new Error("マージには少なくとも2つのPDFが必要です");
     }
@@ -274,7 +278,52 @@ export function usePdfProcessing() {
         }
       }
 
-      return { mergedPdfUrl, mergedImageUrls };
+      // サムネイル生成のための追加コード
+      let thumbnailDataUrl: string | undefined = undefined;
+      if (mergedImageUrls.length > 0) {
+        try {
+          // 最初のページから小さなサムネイルを生成
+          const img = new Image();
+          img.src = mergedImageUrls[0];
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => {
+              console.error("サムネイル用画像の読み込みに失敗しました");
+              resolve();
+            };
+          });
+
+          // キャンバスにサムネイルを描画
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            // 適切なサイズにリサイズ（最大400px、アスペクト比は維持）
+            const maxSize = 400;
+            const scale = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+
+            // 背景を白で塗りつぶす（透明画像対応）
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 高品質描画の設定
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            // 画像描画
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // Base64として保存（高品質設定）
+            thumbnailDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            console.log("Generated high-quality thumbnail for merged document");
+          }
+        } catch (err) {
+          console.error("Failed to generate thumbnail from merged PDFs:", err);
+        }
+      }
+
+      return { mergedPdfUrl, mergedImageUrls, thumbnailDataUrl };
     } catch (err) {
       console.error("Failed to merge PDFs:", err);
       throw new Error(
