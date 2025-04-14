@@ -74,9 +74,7 @@ export function useOcr(): UseOcrReturn {
       return null;
     }
 
-    const loadingId = startLoading(
-      `"${receipt.vendor || "レシート"}"のOCR処理中...`
-    );
+    startLoading(`"${receipt.vendor || "レシート"}"のOCR処理中...`);
     setIsProcessing(true);
     setError(null);
 
@@ -111,7 +109,7 @@ export function useOcr(): UseOcrReturn {
       return null;
     } finally {
       setIsProcessing(false);
-      stopLoading(loadingId);
+      stopLoading();
     }
   };
 
@@ -174,7 +172,7 @@ export function useOcr(): UseOcrReturn {
       return;
     }
 
-    const loadingId = startLoading(`OCR処理を開始: 0/${receipts.length}`);
+    startLoading(`OCR処理を開始: 0/${receipts.length}`);
     setIsProcessing(true);
     setError(null);
     setProcessedCount(0);
@@ -277,7 +275,7 @@ export function useOcr(): UseOcrReturn {
       });
     } finally {
       setIsProcessing(false);
-      stopLoading(loadingId);
+      stopLoading();
     }
   };
 

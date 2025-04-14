@@ -121,7 +121,7 @@ export function useReviewLogic() {
   // アイテムを削除
   const handleDeleteItem = useCallback(
     (id: string) => {
-      const loadingId = startLoading("レシートを削除中...");
+      startLoading("レシートを削除中...");
 
       try {
         const receiptToDelete = receipts.find((receipt) => receipt.id === id);
@@ -166,7 +166,7 @@ export function useReviewLogic() {
           showToast: true,
         });
       } finally {
-        stopLoading(loadingId);
+        stopLoading();
       }
     },
     [
@@ -182,7 +182,7 @@ export function useReviewLogic() {
 
   // すべてのデータをクリア
   const handleClearAllData = useCallback(() => {
-    const loadingId = startLoading("すべてのデータを削除中...");
+    startLoading("すべてのデータを削除中...");
 
     try {
       // BlobURLを解放
@@ -222,7 +222,7 @@ export function useReviewLogic() {
         showToast: true,
       });
     } finally {
-      stopLoading(loadingId);
+      stopLoading();
     }
   }, [
     receipts,

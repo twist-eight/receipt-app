@@ -94,7 +94,7 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
 
   // クライアントを追加
   const addClient = async (client: Omit<Client, "id">) => {
-    const loadingId = startLoading("顧問先を追加中...");
+    startLoading("顧問先を追加中...");
     setError(null);
 
     try {
@@ -112,13 +112,13 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
         fallbackMessage: "顧問先の追加中にエラーが発生しました",
       });
     } finally {
-      stopLoading(loadingId);
+      stopLoading();
     }
   };
 
   // クライアントを更新
   const updateClient = async (id: string, updates: Partial<Client>) => {
-    const loadingId = startLoading("顧問先情報を更新中...");
+    startLoading("顧問先情報を更新中...");
     setError(null);
 
     try {
@@ -138,13 +138,13 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
         fallbackMessage: "顧問先の更新中にエラーが発生しました",
       });
     } finally {
-      stopLoading(loadingId);
+      stopLoading();
     }
   };
 
   // クライアントを削除
   const removeClient = async (id: string) => {
-    const loadingId = startLoading("顧問先を削除中...");
+    startLoading("顧問先を削除中...");
     setError(null);
 
     try {
@@ -167,7 +167,7 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
         fallbackMessage: "顧問先の削除中にエラーが発生しました",
       });
     } finally {
-      stopLoading(loadingId);
+      stopLoading();
     }
   };
 

@@ -2,7 +2,7 @@
 // 中心的な型定義ファイル
 
 // 基本的なレスポンス型
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

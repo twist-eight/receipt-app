@@ -92,7 +92,7 @@ export const clientService = {
     updates: Partial<Client>
   ): Promise<ApiResponse<Client>> {
     try {
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
 

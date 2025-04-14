@@ -139,7 +139,7 @@ export const receiptService = {
   ): Promise<ApiResponse<ReceiptItem>> {
     try {
       // 更新データの準備
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
 
