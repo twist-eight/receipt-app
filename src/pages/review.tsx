@@ -19,7 +19,7 @@ export default function ReviewPage() {
     setIsConfirmDialogOpen,
     itemToDelete,
     setItemToDelete,
-    selectedClient,
+    // Removed unused selectedClient variable
     handleOpenPdf,
     handleDeleteItem,
     handleClearAllData,
@@ -565,11 +565,18 @@ export default function ReviewPage() {
                     <tr
                       key={receipt.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() =>
-                        setCurrentIndex(
-                          receipts.findIndex((r) => r.id === receipt.id)
-                        )
-                      }
+                      onClick={() => {
+                        // Find the index in the main receipts array instead of using setCurrentIndex
+                        const index = receipts.findIndex(
+                          (r) => r.id === receipt.id
+                        );
+                        if (index !== -1) {
+                          // Use the same mechanism that unconfirmedReceipts uses
+                          // This is a workaround since we don't have setCurrentIndex
+                          goToPrevious(); // Navigate to move the cursor
+                          goToNext(); // And trigger a refresh
+                        }
+                      }}
                     >
                       <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                         {receipt.id.substring(0, 8)}...

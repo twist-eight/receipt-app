@@ -1,6 +1,6 @@
 // src/services/clientService.ts
 import { supabase } from "../utils/supabaseClient";
-import { ApiResponse, Client, DocumentTypeConfig } from "../types";
+import { ApiResponse, Client } from "../types";
 
 /**
  * 顧問先データに関するサービス層

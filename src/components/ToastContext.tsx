@@ -71,6 +71,11 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
       "fixed bottom-0 left-1/2 transform -translate-x-1/2 p-4 z-50",
   }[position];
 
+  // トーストを削除
+  const removeToast = useCallback((id: string) => {
+    setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
+  }, []);
+
   // トーストを追加
   const addToast = useCallback(
     (
@@ -109,13 +114,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
 
       return id; // トーストIDを返す（後で手動で削除できるように）
     },
-    [maxToasts]
+    [maxToasts, removeToast] // Add removeToast to dependencies
   );
-
-  // トーストを削除
-  const removeToast = useCallback((id: string) => {
-    setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
-  }, []);
 
   // すべてのトーストをクリア
   const clearToasts = useCallback(() => {

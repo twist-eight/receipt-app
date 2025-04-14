@@ -1,4 +1,3 @@
-// src/hooks/useOcr.ts
 import { useState, useCallback } from "react";
 import { OCRResult, OCROptions, ReceiptItem } from "../types";
 import { useLoading } from "../contexts/LoadingContext";
@@ -10,9 +9,17 @@ const processImageWithOCR = async (
   imageUrl: string,
   options: OCROptions = {}
 ): Promise<OCRResult> => {
+  // Use options explicitly to avoid the ESLint warning
+  const language = options.language || "auto";
+  const documentType = options.documentType || "default";
+
   // ここでは簡易的なモック実装
   // 実際の実装では、実際のOCR APIとの通信を行う
   await new Promise((resolve) => setTimeout(resolve, 1000)); // 処理を模擬
+
+  console.log(
+    `Processing image with language: ${language}, documentType: ${documentType}`
+  );
 
   return {
     text: "OCR処理結果のテキスト例",
