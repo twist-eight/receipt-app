@@ -1,6 +1,5 @@
 // src/hooks/usePdfUtils.ts
 import { useState } from "react";
-import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 
 // PDFワーカーの設定
@@ -21,6 +20,7 @@ export function usePdfUtils() {
     scale: number = 1.5
   ): Promise<string> => {
     try {
+      setIsProcessing(true);
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(pageIndex + 1);
       const viewport = page.getViewport({ scale });
@@ -41,6 +41,8 @@ export function usePdfUtils() {
       console.error("Error converting PDF to image:", err);
       setError("PDFから画像への変換に失敗しました");
       throw err;
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -49,6 +51,7 @@ export function usePdfUtils() {
    */
   const pdfToImages = async (pdfData: Uint8Array): Promise<string[]> => {
     try {
+      setIsProcessing(true);
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const totalPages = pdf.numPages;
       const imageUrls: string[] = [];
@@ -63,6 +66,8 @@ export function usePdfUtils() {
       console.error("Error converting PDF to images:", err);
       setError("PDFから画像への変換に失敗しました");
       throw err;
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -71,8 +76,9 @@ export function usePdfUtils() {
    */
   const getPdfInfo = async (
     pdfData: Uint8Array
-  ): Promise<{ pageCount: number; metadata: any }> => {
+  ): Promise<{ pageCount: number; metadata: Record<string, unknown> }> => {
     try {
+      setIsProcessing(true);
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const metadata = await pdf.getMetadata();
 
@@ -84,6 +90,8 @@ export function usePdfUtils() {
       console.error("Error getting PDF info:", err);
       setError("PDF情報の取得に失敗しました");
       throw err;
+    } finally {
+      setIsProcessing(false);
     }
   };
 

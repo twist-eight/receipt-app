@@ -14,13 +14,19 @@ export const getErrorMessage = (error: unknown): string => {
 
   if (typeof error === "object" && error !== null) {
     // Supabaseなどのエラーオブジェクトに対応
-    if ("message" in error && typeof (error as any).message === "string") {
-      return (error as any).message;
+    if (
+      "message" in error &&
+      typeof (error as Record<string, unknown>).message === "string"
+    ) {
+      return (error as Record<string, string>).message;
     }
 
     // その他のエラー情報を持つオブジェクト
-    if ("error" in error && typeof (error as any).error === "string") {
-      return (error as any).error;
+    if (
+      "error" in error &&
+      typeof (error as Record<string, unknown>).error === "string"
+    ) {
+      return (error as Record<string, string>).error;
     }
   }
 
