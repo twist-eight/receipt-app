@@ -22,8 +22,8 @@ export function usePdfProcessing() {
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(pageIndex + 1);
 
-      // 高解像度スケールを設定（1.5倍）
-      const scale = 1.5;
+      // 高解像度スケールを設定（2.0倍）
+      const scale = 2.0;
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement("canvas");
@@ -40,10 +40,26 @@ export function usePdfProcessing() {
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
 
-      await page.render({ canvasContext: context, viewport }).promise;
-      return canvas.toDataURL("image/jpeg", 0.85); // 品質を調整
+      // 高品質レンダリングを設定
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+
+      // レンダリングタスクを実行
+      const renderTask = page.render({
+        canvasContext: context,
+        viewport,
+        intent: "print", // 高品質用
+      });
+
+      await renderTask.promise;
+
+      // 圧縮率を下げて品質向上
+      return canvas.toDataURL("image/jpeg", 0.9);
     } catch (err) {
-      console.error("Error converting PDF to image:", err);
+      console.error(
+        `Error converting PDF page ${pageIndex + 1} to image:`,
+        err
+      );
       setError("PDFから画像への変換に失敗しました");
       throw err;
     }
@@ -52,20 +68,39 @@ export function usePdfProcessing() {
   // PDFの全ページを画像に変換する
   const pdfToImages = async (pdfData: Uint8Array): Promise<string[]> => {
     try {
+      // pdfjsLib初期化確認
+      if (!pdfjsLib.getDocument) {
+        console.error("PDF.js library not properly initialized");
+        setError("PDF.js libraryが正しく初期化されていません");
+        return [];
+      }
+
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const totalPages = pdf.numPages;
+      console.log(`PDF total pages: ${totalPages}`); // デバッグ用ログ
+
       const imageUrls: string[] = [];
 
       for (let i = 0; i < totalPages; i++) {
-        const imageUrl = await pdfPageToImage(pdfData, i);
-        imageUrls.push(imageUrl);
+        try {
+          const imageUrl = await pdfPageToImage(pdfData, i);
+          imageUrls.push(imageUrl);
+        } catch (err) {
+          console.error(`Error converting page ${i + 1}:`, err);
+          // エラーがあっても処理を続行
+        }
       }
 
+      console.log(`Converted ${imageUrls.length} pages to images`); // デバッグ用ログ
       return imageUrls;
     } catch (err) {
       console.error("Error converting PDF to images:", err);
-      setError("PDFから画像への変換に失敗しました");
-      throw err;
+      setError(
+        `PDFから画像への変換に失敗しました: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      return [];
     }
   };
 
@@ -154,47 +189,58 @@ export function usePdfProcessing() {
     pdfUrls: string[]
   ): Promise<{ mergedPdfUrl: string; mergedImageUrls: string[] }> => {
     if (pdfUrls.length < 2) {
-      throw new Error("At least two PDFs are required for merging");
+      throw new Error("マージには少なくとも2つのPDFが必要です");
     }
 
     try {
+      console.log(`Merging ${pdfUrls.length} PDFs`);
+
       // 空のPDFドキュメントを作成
       const mergedPdfDoc = await PDFDocument.create();
 
       // 各PDFを読み込んでマージ
-      for (const pdfUrl of pdfUrls) {
+      for (let i = 0; i < pdfUrls.length; i++) {
+        const pdfUrl = pdfUrls[i];
+        console.log(`Processing PDF ${i + 1}/${pdfUrls.length}`);
+
         let pdfData: Uint8Array;
 
-        if (pdfUrl.startsWith("blob:")) {
-          // Blob URLからデータを取得
-          const response = await fetch(pdfUrl);
-          const blob = await response.blob();
-          pdfData = new Uint8Array(await blob.arrayBuffer());
-        } else if (pdfUrl.startsWith("data:application/pdf")) {
-          // Data URLからデータを取得
-          const base64Data = pdfUrl.split(",")[1];
-          const binaryString = atob(base64Data);
-          pdfData = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            pdfData[i] = binaryString.charCodeAt(i);
+        try {
+          if (pdfUrl.startsWith("blob:")) {
+            // Blob URLからデータを取得
+            const response = await fetch(pdfUrl);
+            const blob = await response.blob();
+            pdfData = new Uint8Array(await blob.arrayBuffer());
+          } else if (pdfUrl.startsWith("data:application/pdf")) {
+            // Data URLからデータを取得
+            const base64Data = pdfUrl.split(",")[1];
+            const binaryString = atob(base64Data);
+            pdfData = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              pdfData[i] = binaryString.charCodeAt(i);
+            }
+          } else {
+            throw new Error(`未対応のPDF URL形式: ${pdfUrl}`);
           }
-        } else {
-          throw new Error(`Unsupported PDF URL format: ${pdfUrl}`);
+
+          // PDFドキュメントを読み込む
+          const pdfDoc = await PDFDocument.load(pdfData);
+          console.log(`PDF has ${pdfDoc.getPageCount()} pages`);
+
+          // ページをコピー
+          const copiedPages = await mergedPdfDoc.copyPages(
+            pdfDoc,
+            pdfDoc.getPageIndices()
+          );
+
+          // オリジナルのサイズを維持してページを追加
+          copiedPages.forEach((page) => {
+            mergedPdfDoc.addPage(page);
+          });
+        } catch (err) {
+          console.error(`Error merging PDF ${i + 1}:`, err);
+          // エラーが発生しても処理を続行
         }
-
-        // PDFドキュメントを読み込む
-        const pdfDoc = await PDFDocument.load(pdfData);
-
-        // ページをコピー
-        const copiedPages = await mergedPdfDoc.copyPages(
-          pdfDoc,
-          pdfDoc.getPageIndices()
-        );
-
-        // オリジナルのサイズを維持してページを追加
-        copiedPages.forEach((page) => {
-          mergedPdfDoc.addPage(page);
-        });
       }
 
       // マージしたPDFを保存
@@ -204,13 +250,38 @@ export function usePdfProcessing() {
       });
       const mergedPdfUrl = URL.createObjectURL(mergedPdfBlob);
 
+      console.log(
+        `Merged PDF created with ${mergedPdfDoc.getPageCount()} pages`
+      );
+
       // 全ページをサムネイル画像として使用
-      const mergedImageUrls = await pdfToImages(mergedPdfBytes);
+      let mergedImageUrls: string[] = [];
+      try {
+        mergedImageUrls = await pdfToImages(mergedPdfBytes);
+        console.log(
+          `Generated ${mergedImageUrls.length} thumbnails from merged PDF`
+        );
+      } catch (err) {
+        console.error("Failed to generate thumbnails from merged PDF:", err);
+
+        // フォールバック: 少なくとも1ページの画像を生成
+        try {
+          const firstPage = await pdfPageToImage(mergedPdfBytes, 0);
+          mergedImageUrls = [firstPage];
+          console.log("Generated fallback thumbnail");
+        } catch (e) {
+          console.error("Failed to generate even fallback thumbnail:", e);
+        }
+      }
 
       return { mergedPdfUrl, mergedImageUrls };
     } catch (err) {
       console.error("Failed to merge PDFs:", err);
-      throw new Error("PDFのマージに失敗しました");
+      throw new Error(
+        `PDFのマージに失敗しました: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
     }
   };
 
@@ -317,24 +388,160 @@ export function usePdfProcessing() {
     try {
       const results: ReceiptItem[] = [];
       const today = new Date().toISOString().split("T")[0]; // 今日の日付
+      console.log(`Processing ${files.length} files, mergeMode: ${mergeMode}`);
 
       for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
         const file = files[fileIndex];
+        console.log(
+          `Processing file ${fileIndex + 1}/${files.length}: ${file.name} (${
+            file.type
+          })`
+        );
 
         if (file.type === "application/pdf") {
           if (mergeMode) {
             // 複数ページのPDFを1つの受領書として扱う
+            console.log(`Processing PDF in merge mode: ${file.name}`);
             const pdfUrl = URL.createObjectURL(file);
             const fileData = new Uint8Array(await file.arrayBuffer());
 
-            // 全ページの画像を取得
-            const imageUrls = await pdfToImages(fileData);
+            try {
+              // PDFのページ数確認（デバッグ用）
+              const pdf = await pdfjsLib.getDocument({ data: fileData })
+                .promise;
+              console.log(`PDF ${file.name} has ${pdf.numPages} pages`);
 
-            // サムネイルBlobを生成して一時URLを作成
-            const thumbnailBlob = await generateThumbnail(fileData);
-            const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
+              // 全ページの画像を取得
+              const imageUrls = await pdfToImages(fileData);
+              console.log(
+                `Generated ${imageUrls.length} image URLs for merged PDF`
+              );
 
-            // キャッシュに保存（後でアップロード時に使用）
+              if (imageUrls.length === 0) {
+                console.warn(
+                  "No images were generated from PDF, using fallback"
+                );
+                // フォールバック: 少なくとも1つの画像を保証
+                const singleImage = await pdfPageToImage(fileData, 0);
+                imageUrls.push(singleImage);
+              }
+
+              // サムネイルBlobを生成して一時URLを作成
+              const thumbnailBlob = await generateThumbnail(fileData);
+              const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
+
+              // キャッシュに保存（後でアップロード時に使用）
+              const receiptId = uuidv4();
+              sessionStorage.setItem(
+                `thumbnail_${receiptId}`,
+                await blobToBase64(thumbnailBlob)
+              );
+
+              results.push({
+                id: receiptId,
+                imageUrls,
+                pdfUrl,
+                thumbnailUrl, // 一時的なURL（表示用）
+                date: "",
+                updatedAt: today,
+                vendor: "",
+                amount: 0,
+                type: "領収書",
+                memo: "",
+                tag: "",
+                status: "完了",
+              });
+            } catch (err) {
+              console.error(`Error processing merged PDF ${file.name}:`, err);
+              // エラーがあっても処理を継続
+            }
+          } else {
+            // PDFの各ページを別々の受領書として処理
+            try {
+              console.log(`Processing PDF in split mode: ${file.name}`);
+              const pages = await splitPdfPages(file);
+              console.log(`Split PDF into ${pages.length} pages`);
+
+              for (let i = 0; i < pages.length; i++) {
+                const page = pages[i];
+                const pageBlob = await (await fetch(page.pdfUrl)).blob();
+                const pageArrayBuffer = await pageBlob.arrayBuffer();
+                const pageData = new Uint8Array(pageArrayBuffer);
+                // サムネイルBlobを生成して一時URLを作成
+                const thumbnailBlob = await generateThumbnail(pageData);
+                const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
+
+                // キャッシュに保存
+                const receiptId = uuidv4();
+                sessionStorage.setItem(
+                  `thumbnail_${receiptId}`,
+                  await blobToBase64(thumbnailBlob)
+                );
+
+                results.push({
+                  id: receiptId,
+                  imageUrls: [page.imageUrl],
+                  pdfUrl: page.pdfUrl,
+                  thumbnailUrl, // 一時的なURL（表示用）
+                  date: "",
+                  updatedAt: today,
+                  vendor: "",
+                  amount: 0,
+                  type: "領収書",
+                  memo: "",
+                  tag: "",
+                  status: "完了",
+                });
+              }
+            } catch (err) {
+              console.error(`Error processing split PDF ${file.name}:`, err);
+              // エラーがあっても処理を継続
+            }
+          }
+        } else if (file.type.startsWith("image/")) {
+          // 画像ファイルをPDFに変換
+          try {
+            console.log(`Processing image: ${file.name}`);
+            const { imageUrl, pdfUrl } = await convertImageToPdf(file);
+
+            // 画像ファイルの場合は、そのまま縮小してサムネイルとして使用
+            const img = new Image();
+            img.src = imageUrl;
+            await new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+            });
+
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            // 適切なサイズにリサイズ
+            const maxSize = 400;
+            const scale = Math.min(maxSize / img.width, maxSize / img.height);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+
+            // 高品質描画の設定
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = "high";
+
+              // 背景を白で塗りつぶす（透明画像対応）
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            }
+            const thumbnailBlob = await new Promise<Blob>((resolve) => {
+              canvas.toBlob(
+                (blob) => resolve(blob || new Blob([])),
+                "image/jpeg",
+                0.85
+              );
+            });
+
+            const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+
+            // キャッシュに保存
             const receiptId = uuidv4();
             sessionStorage.setItem(
               `thumbnail_${receiptId}`,
@@ -343,7 +550,7 @@ export function usePdfProcessing() {
 
             results.push({
               id: receiptId,
-              imageUrls,
+              imageUrls: [imageUrl],
               pdfUrl,
               thumbnailUrl, // 一時的なURL（表示用）
               date: "",
@@ -355,111 +562,22 @@ export function usePdfProcessing() {
               tag: "",
               status: "完了",
             });
-          } else {
-            // PDFの各ページを別々の受領書として処理
-            const pages = await splitPdfPages(file);
-
-            for (let i = 0; i < pages.length; i++) {
-              const page = pages[i];
-              const pageBlob = await (await fetch(page.pdfUrl)).blob();
-              const pageArrayBuffer = await pageBlob.arrayBuffer();
-              const pageData = new Uint8Array(pageArrayBuffer);
-              // サムネイルBlobを生成して一時URLを作成
-              const thumbnailBlob = await generateThumbnail(pageData);
-              const thumbnailUrl = await createThumbnailUrl(thumbnailBlob);
-
-              // キャッシュに保存
-              const receiptId = uuidv4();
-              sessionStorage.setItem(
-                `thumbnail_${receiptId}`,
-                await blobToBase64(thumbnailBlob)
-              );
-
-              results.push({
-                id: receiptId,
-                imageUrls: [page.imageUrl],
-                pdfUrl: page.pdfUrl,
-                thumbnailUrl, // 一時的なURL（表示用）
-                date: "",
-                updatedAt: today,
-                vendor: "",
-                amount: 0,
-                type: "領収書",
-                memo: "",
-                tag: "",
-                status: "完了",
-              });
-            }
+          } catch (err) {
+            console.error(`Error processing image ${file.name}:`, err);
+            // エラーがあっても処理を継続
           }
-        } else if (file.type.startsWith("image/")) {
-          // 画像ファイルをPDFに変換
-          const { imageUrl, pdfUrl } = await convertImageToPdf(file);
-
-          // 画像ファイルの場合は、そのまま縮小してサムネイルとして使用
-          const img = new Image();
-          img.src = imageUrl;
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-          });
-
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-
-          // 適切なサイズにリサイズ
-          const maxSize = 400;
-          const scale = Math.min(maxSize / img.width, maxSize / img.height);
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-
-          // 高品質描画の設定
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-
-            // 背景を白で塗りつぶす（透明画像対応）
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          }
-          const thumbnailBlob = await new Promise<Blob>((resolve) => {
-            canvas.toBlob(
-              (blob) => resolve(blob || new Blob([])),
-              "image/jpeg",
-              0.85
-            );
-          });
-
-          const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
-
-          // キャッシュに保存
-          const receiptId = uuidv4();
-          sessionStorage.setItem(
-            `thumbnail_${receiptId}`,
-            await blobToBase64(thumbnailBlob)
-          );
-
-          results.push({
-            id: receiptId,
-            imageUrls: [imageUrl],
-            pdfUrl,
-            thumbnailUrl, // 一時的なURL（表示用）
-            date: "",
-            updatedAt: today,
-            vendor: "",
-            amount: 0,
-            type: "領収書",
-            memo: "",
-            tag: "",
-            status: "完了",
-          });
         }
       }
 
+      console.log(`Processed ${results.length} items successfully`);
       return results;
     } catch (err) {
       console.error("Error processing files:", err);
-      setError("ファイル処理中にエラーが発生しました");
+      setError(
+        `ファイル処理中にエラーが発生しました: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
       return [];
     } finally {
       setIsProcessing(false);

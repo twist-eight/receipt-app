@@ -3,8 +3,10 @@ import { OCRResult, OCROptions, ReceiptItem } from "../types";
 import { useLoading } from "../contexts/LoadingContext";
 import { useToast } from "../components/ToastContext";
 import { useErrorHandler } from "../utils/errorHandling";
+import { processImageWithOCR } from "../utils/ocrService";
 
 // OCRサービスのモックインポート（実際の実装は適宜置き換え）
+/*
 const processImageWithOCR = async (
   imageUrl: string,
   options: OCROptions = {}
@@ -33,7 +35,7 @@ const processImageWithOCR = async (
     ],
   };
 };
-
+*/
 interface UseOcrReturn {
   runOcr: (
     receipt: ReceiptItem,

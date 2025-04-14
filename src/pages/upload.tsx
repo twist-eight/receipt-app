@@ -68,10 +68,23 @@ export default function UploadPage() {
     setError(null);
 
     try {
+      console.log(
+        `Processing ${files.length} files with mergeMode: ${mergeMode}`
+      ); // デバッグ用ログ
+
+      // PDFファイルの存在確認
+      const pdfFiles = files.filter((file) => file.type === "application/pdf");
+      console.log(`Found ${pdfFiles.length} PDF files`); // デバッグ用ログ
+
       // OCR実行を削除し、ファイルの処理のみを行う
       const results = await processFiles(files, mergeMode);
 
       if (results.length > 0) {
+        console.log(`Processed ${results.length} files, first result:`, {
+          id: results[0].id,
+          pages: results[0].imageUrls?.length,
+        }); // デバッグ用ログ
+
         // 選択した種類がある場合、すべての結果に適用
         if (selectedType) {
           results.forEach((result) => {
@@ -94,7 +107,11 @@ export default function UploadPage() {
       }
     } catch (err) {
       console.error("Upload processing error:", err);
-      setError("ファイル処理中にエラーが発生しました");
+      setError(
+        `ファイル処理中にエラーが発生しました: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
     }
   };
 
