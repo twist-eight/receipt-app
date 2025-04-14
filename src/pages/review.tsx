@@ -1,232 +1,37 @@
 // src/pages/review.tsx
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/router";
-import { useReceiptContext } from "../contexts/ReceiptContext";
-import { useClientContext } from "../contexts/ClientContext";
-import { useReloadWarning } from "../hooks/useReloadWarning";
+import React from "react";
+import Link from "next/link";
+import { useReviewLogic } from "../containers/ReviewContainer";
 import ConfirmDialog from "../components/ConfirmDialog";
 import ImageCarousel from "../components/ImageCarousel";
-import { ReceiptItem, ReceiptType, TransferType } from "../types/receipt";
-import Link from "next/link";
+import ErrorMessage from "../components/ErrorMessage";
 
 export default function ReviewPage() {
-  const router = useRouter();
-  const { receipts, updateReceipt, removeReceipt, clearReceipts } =
-    useReceiptContext();
-  const { selectedClientId, clients } = useClientContext();
-  const [error, setError] = useState<string | null>(null);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
-    useState<boolean>(false);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [confirmedItems, setConfirmedItems] = useState<Set<string>>(new Set());
-
-  // リロード警告を有効化（データがある場合のみ）
-  useReloadWarning(
-    receipts.length > 0,
-    "ページをリロードすると画像とPDFが表示できなくなる可能性があります。続けますか？"
-  );
-
-  // 選択中の顧問先情報
-  const selectedClient = selectedClientId
-    ? clients.find((c) => c.id === selectedClientId)
-    : null;
-
-  // 未確認アイテムのみをフィルタリング
-  const unconfirmedReceipts = useMemo(() => {
-    return receipts.filter((receipt) => !confirmedItems.has(receipt.id));
-  }, [receipts, confirmedItems]);
-
-  // 現在のレシート - 未確認のもののみから選択
-  const currentReceipt = unconfirmedReceipts[currentIndex] || null;
-
-  // データが存在しない場合のインデックス調整
-  useEffect(() => {
-    if (unconfirmedReceipts.length === 0) {
-      setCurrentIndex(0);
-    } else if (currentIndex >= unconfirmedReceipts.length) {
-      setCurrentIndex(Math.max(0, unconfirmedReceipts.length - 1));
-    }
-  }, [unconfirmedReceipts, currentIndex]);
-
-  // 初期表示時にisConfirmedフラグがついているアイテムを確認済みセットに追加
-  useEffect(() => {
-    const newConfirmedItems = new Set<string>();
-    receipts.forEach((receipt) => {
-      if (receipt.isConfirmed) {
-        newConfirmedItems.add(receipt.id);
-      }
-    });
-    setConfirmedItems(newConfirmedItems);
-  }, [receipts]);
-
-  // PDFを開く処理
-  const handleOpenPdf = (pdfUrl: string) => {
-    try {
-      if (pdfUrl.startsWith("blob:") || pdfUrl.startsWith("http")) {
-        window.open(pdfUrl, "_blank");
-      } else if (pdfUrl.startsWith("data:application/pdf")) {
-        const byteCharacters = atob(pdfUrl.split(",")[1]);
-        const byteNumbers = new Array(byteCharacters.length)
-          .fill(0)
-          .map((_, i) => byteCharacters.charCodeAt(i));
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: "application/pdf" });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, "_blank");
-      } else {
-        throw new Error("無効なPDF URLです");
-      }
-    } catch (err) {
-      console.error("PDFを開く際にエラーが発生しました:", err);
-      setError(
-        `PDFを開けませんでした: ${
-          err instanceof Error ? err.message : String(err)
-        }`
-      );
-    }
-  };
-
-  // アイテムを削除
-  const handleDeleteItem = (id: string) => {
-    setIsConfirmDialogOpen(false);
-
-    const receiptToDelete = receipts.find((receipt) => receipt.id === id);
-    if (!receiptToDelete) return;
-
-    // BlobURLを解放
-    try {
-      if (receiptToDelete.imageUrls) {
-        receiptToDelete.imageUrls.forEach((imageUrl) => {
-          if (imageUrl.startsWith("blob:")) {
-            URL.revokeObjectURL(imageUrl);
-          }
-        });
-      }
-      if (receiptToDelete.pdfUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(receiptToDelete.pdfUrl);
-      }
-    } catch (e) {
-      console.error("Failed to revoke URLs:", e);
-    }
-
-    // 確認済みアイテムリストからも削除
-    setConfirmedItems((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
-
-    // コンテキスト経由で削除
-    removeReceipt(id);
-
-    // インデックスを調整
-    if (currentIndex >= receipts.length - 1) {
-      setCurrentIndex(Math.max(0, receipts.length - 2));
-    }
-  };
-
-  // すべてのデータをクリア
-  const handleClearAllData = () => {
-    // BlobURLを解放
-    receipts.forEach((receipt) => {
-      if (receipt.imageUrls) {
-        receipt.imageUrls.forEach((imageUrl) => {
-          if (imageUrl.startsWith("blob:")) {
-            try {
-              URL.revokeObjectURL(imageUrl);
-            } catch (e) {
-              console.error("Failed to revoke image URL:", e);
-            }
-          }
-        });
-      }
-      if (receipt.pdfUrl.startsWith("blob:")) {
-        try {
-          URL.revokeObjectURL(receipt.pdfUrl);
-        } catch (e) {
-          console.error("Failed to revoke PDF URL:", e);
-        }
-      }
-    });
-
-    // コンテキスト経由で全削除
-    clearReceipts();
-    setIsConfirmDialogOpen(false);
-    // 確認済みアイテムもクリア
-    setConfirmedItems(new Set());
-  };
-
-  // フィールド更新
-  const handleUpdateField = <K extends keyof ReceiptItem>(
-    field: K,
-    value: ReceiptItem[K]
-  ) => {
-    if (!currentReceipt) return;
-    updateReceipt(currentReceipt.id, { [field]: value });
-  };
-
-  // アイテムを確認済みとしてマーク
-  const toggleConfirmed = (id: string) => {
-    // 現在のアイテムが要質問の場合は確認済みにできない
-    const receipt = receipts.find((r) => r.id === id);
-    if (receipt && receipt.status === "要質問") {
-      return; // 要質問の場合は何もしない
-    }
-
-    // isConfirmedフラグを更新
-    updateReceipt(id, { isConfirmed: !confirmedItems.has(id) });
-
-    setConfirmedItems((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      // セッションストレージに保存
-      sessionStorage.setItem("confirmedItems", JSON.stringify([...newSet]));
-      return newSet;
-    });
-  };
-
-  // 前のアイテムへ移動
-  const goToPrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
-  // 次のアイテムへ移動
-  const goToNext = () => {
-    if (currentIndex < unconfirmedReceipts.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  // Supabase登録ページへ移動
-  const goToExport = () => {
-    router.push("/export");
-  };
-
-  // 種類のオプション
-  const typeOptions: ReceiptType[] = [
-    "領収書",
-    "明細書",
-    "契約書",
-    "見積書",
-    "通帳",
-  ];
-
-  // 授受区分のオプション
-  const transferTypeOptions: TransferType[] = ["受取", "渡し", "内部資料"];
-
-  // 選択したタイプのサブタイプを取得する関数
-  const getSubTypesForSelectedType = (type: string | null) => {
-    if (!selectedClient || !type) return [];
-
-    const docType = selectedClient.documentTypes.find((dt) => dt.type === type);
-    return docType ? docType.subTypes : [];
-  };
+  const {
+    receipts,
+    unconfirmedReceipts,
+    currentReceipt,
+    currentIndex,
+    confirmedItems,
+    error,
+    setError,
+    isConfirmDialogOpen,
+    setIsConfirmDialogOpen,
+    itemToDelete,
+    setItemToDelete,
+    selectedClient,
+    handleOpenPdf,
+    handleDeleteItem,
+    handleClearAllData,
+    handleUpdateField,
+    toggleConfirmed,
+    goToPrevious,
+    goToNext,
+    goToExport,
+    getSubTypesForSelectedType,
+    typeOptions,
+    transferTypeOptions,
+  } = useReviewLogic();
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -260,16 +65,11 @@ export default function ReviewPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 text-red-700 hover:text-red-900"
-            aria-label="エラーメッセージを閉じる"
-          >
-            ×
-          </button>
-        </div>
+        <ErrorMessage
+          message={error}
+          onClose={() => setError(null)}
+          className="mb-4"
+        />
       )}
 
       {/* 進捗状況と登録ボタン */}
@@ -390,7 +190,10 @@ export default function ReviewPage() {
                 </span>
               </div>
               <button
-                onClick={() => handleDeleteItem(currentReceipt.id)}
+                onClick={() => {
+                  setItemToDelete(currentReceipt.id);
+                  setIsConfirmDialogOpen(true);
+                }}
                 className="text-red-500 hover:text-red-700 p-1"
                 aria-label="削除"
               >
@@ -782,6 +585,7 @@ export default function ReviewPage() {
                           ? `¥${receipt.amount.toLocaleString()}`
                           : "未設定"}
                       </td>
+
                       <td className="px-4 py-2 whitespace-nowrap text-sm">
                         {receipt.type || "領収書"}
                       </td>
@@ -807,12 +611,27 @@ export default function ReviewPage() {
       {/* 確認ダイアログ */}
       {isConfirmDialogOpen && (
         <ConfirmDialog
-          title="全データを削除しますか？"
-          message="すべてのレシートデータが完全に削除されます。この操作は元に戻せません。"
+          title={
+            itemToDelete
+              ? "レシートを削除しますか？"
+              : "全データを削除しますか？"
+          }
+          message={
+            itemToDelete
+              ? "このレシートが完全に削除されます。この操作は元に戻せません。"
+              : "すべてのレシートデータが完全に削除されます。この操作は元に戻せません。"
+          }
           confirmLabel="削除する"
           cancelLabel="キャンセル"
-          onConfirm={handleClearAllData}
-          onCancel={() => setIsConfirmDialogOpen(false)}
+          onConfirm={
+            itemToDelete
+              ? () => handleDeleteItem(itemToDelete)
+              : handleClearAllData
+          }
+          onCancel={() => {
+            setIsConfirmDialogOpen(false);
+            setItemToDelete(null);
+          }}
           isDestructive={true}
         />
       )}

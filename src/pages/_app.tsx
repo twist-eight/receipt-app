@@ -2,9 +2,27 @@
 import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import Link from "next/link";
-import { ReceiptProvider } from "../contexts/ReceiptContext";
-import { ClientProvider, useClientContext } from "../contexts/ClientContext";
+import AppProviders from "../components/AppProviders";
+import { useClientContext } from "../contexts/ClientContext";
 
+function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <AppProviders>
+      <div className="min-h-screen bg-gray-50">
+        <HeaderWithClient />
+        {/* ヘッダーの高さ分だけパディングを追加 */}
+        <main className="py-6 px-4 pt-32">
+          <Component {...pageProps} />
+        </main>
+        <footer className="py-4 text-center text-gray-500 text-sm">
+          &copy; {new Date().getFullYear()} 領収書処理システム
+        </footer>
+      </div>
+    </AppProviders>
+  );
+}
+
+// HeaderComponent - UIコンポーネント
 const HeaderComponent = () => {
   const { selectedClientId, clients } = useClientContext();
 
@@ -40,7 +58,7 @@ const HeaderComponent = () => {
           </div>
         )}
 
-        {/* 既存のナビゲーションメニュー */}
+        {/* ナビゲーションメニュー */}
         <nav className="flex items-center gap-6 text-sm overflow-x-auto">
           <Link
             href="/"
@@ -108,31 +126,9 @@ const HeaderComponent = () => {
   );
 };
 
-// AppWithProvidersコンポーネントのメイン部分も修正します
-function AppWithProviders({ Component, pageProps }: AppProps) {
-  return (
-    <ClientProvider>
-      <ReceiptProvider>
-        <div className="min-h-screen bg-gray-50">
-          <HeaderWithClient />
-          {/* ヘッダーの高さ分だけパディングを追加 */}
-          <main className="py-6 px-4 pt-32">
-            <Component {...pageProps} />
-          </main>
-          <footer className="py-4 text-center text-gray-500 text-sm">
-            &copy; {new Date().getFullYear()} 領収書処理システム
-          </footer>
-        </div>
-      </ReceiptProvider>
-    </ClientProvider>
-  );
-}
-
 // ClientContextを使用するためにヘッダーを分離
 const HeaderWithClient = () => {
   return <HeaderComponent />;
 };
 
-export default function App(props: AppProps) {
-  return <AppWithProviders {...props} />;
-}
+export default MyApp;
