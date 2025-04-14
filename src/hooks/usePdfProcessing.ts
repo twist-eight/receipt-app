@@ -21,7 +21,10 @@ export function usePdfProcessing() {
     try {
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(pageIndex + 1);
-      const viewport = page.getViewport({ scale: 1.5 });
+
+      // 高解像度スケールを設定（1.5倍）
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
@@ -33,8 +36,12 @@ export function usePdfProcessing() {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
+      // 背景を白で塗りつぶし（透明部分の問題を解決）
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
       await page.render({ canvasContext: context, viewport }).promise;
-      return canvas.toDataURL("image/jpeg");
+      return canvas.toDataURL("image/jpeg", 0.85); // 品質を調整
     } catch (err) {
       console.error("Error converting PDF to image:", err);
       setError("PDFから画像への変換に失敗しました");
@@ -75,6 +82,8 @@ export function usePdfProcessing() {
       for (let i = 0; i < totalPages; i++) {
         const newPdf = await PDFDocument.create();
         const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
+
+        // オリジナルのページサイズをそのまま使用
         newPdf.addPage(copiedPage);
 
         const pdfBytes = await newPdf.save();
@@ -106,18 +115,26 @@ export function usePdfProcessing() {
       const pdfDoc = await PDFDocument.create();
       const imageBytes = await file.arrayBuffer();
 
+      // 画像の種類に応じて埋め込み
       const ext = file.type.split("/")[1];
       const embedded =
         ext === "png"
           ? await pdfDoc.embedPng(imageBytes)
           : await pdfDoc.embedJpg(imageBytes);
 
-      const page = pdfDoc.addPage();
+      // 画像の元のサイズを取得
+      const imgWidth = embedded.width;
+      const imgHeight = embedded.height;
+
+      // 画像サイズに合わせたページを作成
+      const page = pdfDoc.addPage([imgWidth, imgHeight]);
+
+      // 画像をページに描画（アスペクト比を維持）
       page.drawImage(embedded, {
         x: 0,
         y: 0,
-        width: page.getWidth(),
-        height: page.getHeight(),
+        width: imgWidth,
+        height: imgHeight,
       });
 
       const pdfBytes = await pdfDoc.save();
@@ -174,7 +191,7 @@ export function usePdfProcessing() {
           pdfDoc.getPageIndices()
         );
 
-        // ページを追加
+        // オリジナルのサイズを維持してページを追加
         copiedPages.forEach((page) => {
           mergedPdfDoc.addPage(page);
         });
@@ -198,6 +215,7 @@ export function usePdfProcessing() {
   };
 
   // PDFからサムネイルを生成する関数（Blob形式で返す）
+  // src/hooks/usePdfProcessing.ts - generateThumbnail関数を修正
   const generateThumbnail = async (
     pdfData: Uint8Array,
     maxWidth = 200,
@@ -208,12 +226,26 @@ export function usePdfProcessing() {
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(1); // 最初のページのみ使用
 
-      // 適切なスケールを計算（小さいサイズに抑える）
+      // 元のページビューポートを取得
       const viewport = page.getViewport({ scale: 1.0 });
-      const scale = Math.min(
-        maxWidth / viewport.width,
-        maxHeight / viewport.height
-      );
+
+      // アスペクト比を計算
+      const aspectRatio = viewport.width / viewport.height;
+
+      // サムネイルの幅と高さを決定（アスペクト比を維持）
+      let width, height;
+      if (aspectRatio > 1) {
+        // 横長の場合
+        width = Math.min(maxWidth, viewport.width);
+        height = width / aspectRatio;
+      } else {
+        // 縦長の場合
+        height = Math.min(maxHeight, viewport.height);
+        width = height * aspectRatio;
+      }
+
+      // アスペクト比を維持したスケールを計算
+      const scale = width / viewport.width;
       const scaledViewport = page.getViewport({ scale });
 
       // キャンバスにレンダリング
@@ -226,10 +258,14 @@ export function usePdfProcessing() {
         throw new Error("Canvas context could not be created");
       }
 
+      // 背景を白で塗りつぶす（透明部分対応）
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
       await page.render({ canvasContext: context, viewport: scaledViewport })
         .promise;
 
-      // JPEG形式でBlobとして返す（品質を下げて容量を削減）
+      // JPEG形式でBlobとして返す
       return new Promise<Blob>((resolve) => {
         canvas.toBlob(
           (blob) => {

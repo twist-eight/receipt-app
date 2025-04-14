@@ -36,12 +36,29 @@ export function useThumbnails() {
         throw new Error("Canvas 2D contextの取得に失敗しました");
       }
 
-      // 適切なサイズにリサイズ
-      const scale = Math.min(maxSize / img.width, maxSize / img.height);
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
+      // アスペクト比を維持したサイズ計算
+      const aspectRatio = img.width / img.height;
+      let width, height;
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (aspectRatio > 1) {
+        // 横長の場合
+        width = Math.min(maxSize, img.width);
+        height = width / aspectRatio;
+      } else {
+        // 縦長の場合
+        height = Math.min(maxSize, img.height);
+        width = height * aspectRatio;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // 背景を白で塗りつぶす
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 画像を描画
+      ctx.drawImage(img, 0, 0, width, height);
 
       // JPEG形式で圧縮して返す（品質0.7）
       const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
