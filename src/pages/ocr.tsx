@@ -5,8 +5,8 @@ import { useRouter } from "next/router";
 import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
 import { useClientContext } from "../features/clients/contexts/ClientContext";
 import ImageCarousel from "../features/ui/components/ImageCarousel";
-import ConfirmDialog from "../components/ConfirmDialog";
-import { ReceiptType } from "../types/receipt";
+import ConfirmDialog from "../shared/components/ConfirmDialog";
+import { ReceiptType } from "../features/receipts/types/receipt";
 import { useOcr } from "../features/ocr/hooks/useOcr";
 import OcrResultDisplay from "../features/ocr/components/OcrResultDisplay"; // 追加
 import Image from "next/image";

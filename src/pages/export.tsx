@@ -6,7 +6,7 @@ import {
   useSupabaseSync,
   SupabaseSyncOptions,
 } from "../features/supabase/hooks/useSupabaseSync";
-import ConfirmDialog from "../components/ConfirmDialog";
+import ConfirmDialog from "../shared/components/ConfirmDialog";
 import Link from "next/link";
 
 export default function ExportPage() {

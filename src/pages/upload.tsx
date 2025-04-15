@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link"; // 追加
-import FileUploader from "../components/FileUploader";
+import FileUploader from "../shared/components/FileUploader";
 import { usePdfProcessing } from "../features/pdf/hooks/usePdfProcessing";
 import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
 import { useClientContext } from "../features/clients/contexts/ClientContext"; // 追加
-import { ReceiptType, TransferType } from "../types/receipt"; // TransferTypeを追加
+import { ReceiptType, TransferType } from "../features/receipts/types/receipt"; // TransferTypeを追加
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);

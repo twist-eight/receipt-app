@@ -5,7 +5,7 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { ReceiptItem } from "../../../types/receipt";
+import { ReceiptItem } from "../types/receipt";
 
 interface ReceiptContextType {
   receipts: ReceiptItem[];

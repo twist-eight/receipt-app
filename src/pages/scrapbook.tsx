@@ -2,9 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useClientContext } from "../features/clients/contexts/ClientContext";
-import { fetchSavedReceipts } from "../utils/receiptApi";
-import { ReceiptItem } from "../types/receipt";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { fetchSavedReceipts } from "../features/receipts/services/receiptApi";
+import { ReceiptItem } from "../features/receipts/types/receipt";
+import LoadingSpinner from "../shared/components/LoadingSpinner";
 import Link from "next/link";
 
 export default function ScrapbookPage() {

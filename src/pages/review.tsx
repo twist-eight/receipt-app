@@ -2,9 +2,9 @@
 import React from "react";
 import Link from "next/link";
 import { useReviewLogic } from "../features/receipts/containers/ReviewContainer";
-import ConfirmDialog from "../components/ConfirmDialog";
+import ConfirmDialog from "../shared/components/ConfirmDialog";
 import ImageCarousel from "../features/ui/components/ImageCarousel";
-import ErrorMessage from "../components/ErrorMessage";
+import ErrorMessage from "../shared/components/ErrorMessage";
 
 export default function ReviewPage() {
   const {

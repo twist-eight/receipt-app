@@ -1,6 +1,6 @@
 import React from "react";
-import { ReceiptItem } from "../types/receipt";
-import ImageCarousel from "../features/ui/components/ImageCarousel";
+import { ReceiptItem, ReceiptType, ReceiptStatus } from "../types/receipt";
+import ImageCarousel from "../../ui/components/ImageCarousel";
 
 interface ReceiptCardProps {
   receipt: ReceiptItem;
@@ -141,7 +141,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
           <label className="block text-xs text-gray-500 mb-1">種類</label>
           <select
             value={receipt.type}
-            onChange={(e) => onChange("type", e.target.value)}
+            onChange={(e) => onChange("type", e.target.value as ReceiptType)}
             className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="領収書">領収書</option>
@@ -178,7 +178,9 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
           <label className="block text-xs text-gray-500 mb-1">ステータス</label>
           <select
             value={receipt.status}
-            onChange={(e) => onChange("status", e.target.value)}
+            onChange={(e) =>
+              onChange("status", e.target.value as ReceiptStatus)
+            }
             className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="完了">完了</option>

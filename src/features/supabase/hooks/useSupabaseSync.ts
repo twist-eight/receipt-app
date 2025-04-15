@@ -1,6 +1,6 @@
 // src/hooks/useSupabaseSync.ts
 import { useState } from "react";
-import { ReceiptItem } from "../../../types/receipt";
+import { ReceiptItem } from "../../receipts/types/receipt";
 import { Client } from "../../clients/types/client";
 import { supabase } from "../../../lib/supabaseClient";
 import * as pdfjsLib from "pdfjs-dist";

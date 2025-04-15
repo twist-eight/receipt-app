@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
 import { useClientContext } from "../../clients/contexts/ClientContext";
-import { useReloadWarning } from "../../../hooks/useReloadWarning";
+import { useReloadWarning } from "../../../shared/hooks/useReloadWarning";
 import { useErrorHandler } from "../../../shared/utils/errorHandling";
 import { useLoading } from "../../../shared/contexts/LoadingContext";
 import { useToast } from "../../../shared/contexts/ToastContext";
