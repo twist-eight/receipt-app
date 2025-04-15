@@ -1,4 +1,6 @@
-// Google Cloud Vision API用に完全修正 + 結果パース精度向上（実レシート対応強化）
+// src/features/ocr/services/ocrService.ts
+
+import { extractDataWithGPT } from "./gptExtractor";
 
 // OCR結果の型定義
 export interface OCRResult {
@@ -6,11 +8,11 @@ export interface OCRResult {
   vendor?: string; // 取引先（ベンダー名）
   date?: string; // 日付（YYYY-MM-DD）
   amount?: number; // 合計金額
-  tNumber?: string; // T番号（取引番号）追加
+  tNumber?: string; // T番号（取引番号）
   items?: {
     description: string; // 商品名や項目名
     price: number; // 金額
-    quantity?: number; // 数量（未使用）
+    quantity?: number; // 数量
   }[];
   confidence: number; // 平均信頼度（0.0〜1.0）
 }
@@ -18,7 +20,8 @@ export interface OCRResult {
 // OCR処理のオプション
 export interface OCROptions {
   language?: string; // 言語ヒント（例: "ja"）
-  documentType?: string; // ドキュメントタイプ（未使用）
+  documentType?: string; // ドキュメントタイプ
+  useGpt?: boolean; // GPT利用フラグ（デフォルトtrue）
 }
 
 // Vision APIレスポンス型定義
@@ -45,15 +48,6 @@ interface VisionApiResponse {
       confidence?: number;
     }>;
   }>;
-}
-
-// Vision APIの単語アノテーション型
-interface WordAnnotation {
-  symbols?: Array<{
-    text?: string;
-    confidence?: number;
-  }>;
-  confidence?: number;
 }
 
 // OCR設定をローカルストレージから取得
@@ -89,7 +83,36 @@ async function imageUrlToBase64(imageUrl: string): Promise<string> {
   }
 }
 
-// Google Vision APIを使って画像から文字を抽出し、構造化するメイン関数
+// 単語ごとの信頼度を平均して全体信頼度を算出
+function calculateConfidence(
+  response: VisionApiResponse["responses"][0]
+): number {
+  try {
+    const blocks = response.fullTextAnnotation?.pages?.[0]?.blocks || [];
+    const words = blocks
+      .flatMap((b) => b.paragraphs || [])
+      .flatMap((p) => p.words || [])
+      .filter(
+        (
+          w
+        ): w is {
+          symbols?: Array<{
+            text?: string;
+            confidence?: number;
+          }>;
+          confidence?: number;
+        } => w !== undefined
+      );
+    const confidences = words.map((w) => w.confidence || 0);
+    const avg =
+      confidences.reduce((a, b) => a + b, 0) / (confidences.length || 1);
+    return avg;
+  } catch {
+    return 0.7;
+  }
+}
+
+// メイン関数：Google Cloud Vision API + GPT-4o miniで画像から文字を抽出・構造化
 export async function processImageWithOCR(
   imageUrl: string,
   options: OCROptions = {}
@@ -97,12 +120,16 @@ export async function processImageWithOCR(
   const settings = getOcrSettings();
   const apiKey = settings.apiKey;
   const language = options.language || settings.defaultLanguage;
-  if (!apiKey)
+  const useGpt = options.useGpt !== false; // デフォルトでGPTを使用
+
+  if (!apiKey) {
     throw new Error(
       "OCR APIキーが設定されていません。設定ページでAPIキーを設定してください。"
     );
+  }
 
   try {
+    // ステップ1: Google Vision APIで画像からテキストを抽出
     const base64Image = await imageUrlToBase64(imageUrl);
     const base64Data = base64Image.split(",")[1];
     const apiEndpoint = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
@@ -132,172 +159,54 @@ export async function processImageWithOCR(
     const extractedText = data.responses?.[0]?.fullTextAnnotation?.text || "";
     const confidenceValue = calculateConfidence(data.responses[0]);
 
-    // パース処理：ベンダー名、日付、金額、明細を抽出
-    const lines = extractedText.split("\n");
-    const vendor = extractVendor(lines, extractedText);
-    const date = extractDate(extractedText);
-    const amount = extractAmount(extractedText);
-    const items = extractItems(lines);
-    const tNumber = extractTNumber(extractedText); // T番号抽出を追加
+    // ステップ2: GPT-4o miniを使って構造化情報を抽出
+    if (useGpt) {
+      try {
+        // OpenAI APIキーを設定から取得
+        const openAIApiKey = localStorage.getItem("openai_api_key") || "";
 
-    return {
-      text: extractedText,
-      vendor,
-      date,
-      amount,
-      items,
-      tNumber,
-      confidence: confidenceValue,
-    };
+        if (!openAIApiKey) {
+          console.warn(
+            "OpenAI APIキーが設定されていないため、構造化抽出をスキップします"
+          );
+          // 基本的なOCR結果のみを返す
+          return {
+            text: extractedText,
+            confidence: confidenceValue,
+          };
+        }
+
+        // GPT-4o miniを使って構造化情報を抽出
+        const gptResult = await extractDataWithGPT(extractedText, openAIApiKey);
+
+        // 完全にGPTの結果に基づくOCR結果を返す
+        return {
+          text: extractedText,
+          vendor: gptResult.vendor,
+          date: gptResult.date,
+          amount: gptResult.amount,
+          tNumber: gptResult.tNumber,
+          items: gptResult.items,
+          // GPTの信頼度とVision APIの信頼度の平均を取る
+          confidence: (gptResult.confidence + confidenceValue) / 2,
+        };
+      } catch (error) {
+        console.error("GPTによる情報抽出に失敗しました:", error);
+        // エラー時はテキストのみの結果を返す
+        return {
+          text: extractedText,
+          confidence: confidenceValue,
+        };
+      }
+    } else {
+      // GPT使用しない場合はテキストのみの結果を返す
+      return {
+        text: extractedText,
+        confidence: confidenceValue,
+      };
+    }
   } catch (error) {
     console.error("OCRエラー:", error);
     throw error;
   }
-}
-
-// 単語ごとの信頼度を平均して全体信頼度を算出
-function calculateConfidence(
-  response: VisionApiResponse["responses"][0]
-): number {
-  try {
-    const blocks = response.fullTextAnnotation?.pages?.[0]?.blocks || [];
-    const words = blocks
-      .flatMap((b) => b.paragraphs || [])
-      .flatMap((p) => p.words || [])
-      .filter((w): w is WordAnnotation => w !== undefined);
-    const confidences = words.map((w) => w.confidence || 0);
-    const avg =
-      confidences.reduce((a, b) => a + b, 0) / (confidences.length || 1);
-    return avg;
-  } catch {
-    return 0.7;
-  }
-}
-
-// 取引先名を抽出する関数を強化
-function extractVendor(lines: string[], fullText: string): string {
-  // 会社名や店舗名を示す特徴的なパターン
-  const companyPatterns = [
-    /株式会社([\p{L}\d\s]{1,20})/u,
-    /([\p{L}\d\s]{1,20})株式会社/u,
-    /有限会社([\p{L}\d\s]{1,20})/u,
-    /([\p{L}\d\s]{1,20})有限会社/u,
-    /合同会社([\p{L}\d\s]{1,20})/u,
-  ];
-
-  // よく見られる店舗名のパターン
-  const storeNames = [
-    /マルエツ|イオン|ローソン|ファミリーマート|セブン|イトーヨーカドー|ドン・キホーテ|ユニクロ/i,
-  ];
-
-  // 最初に会社名パターンを確認
-  for (const pattern of companyPatterns) {
-    const match = fullText.match(pattern);
-    if (match) {
-      return match[0].trim();
-    }
-  }
-
-  // 次に店舗名パターンを確認
-  for (const pattern of storeNames) {
-    const match = fullText.match(pattern);
-    if (match) {
-      return match[0].trim();
-    }
-  }
-
-  // 特定のパターンが見つからない場合、最初の行をベンダー名とする
-  // ただし短すぎる場合は除外（ヘッダーや日付などの可能性）
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    if (trimmedLine.length > 3 && !/^\d+[-\/]\d/.test(trimmedLine)) {
-      return trimmedLine;
-    }
-  }
-
-  return lines[0] || "";
-}
-
-// 日付の抽出 - より強化した正規表現パターン
-function extractDate(text: string): string {
-  // 複数の日付形式に対応（2024年1月5日、2024/01/05、2024-01-05など）
-  const datePatterns = [
-    /(\d{4})[年\/\-]\s*(\d{1,2})[月\/\-]\s*(\d{1,2})日?/,
-    /(\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/, // YY/MM/DD形式も対応
-  ];
-
-  for (const pattern of datePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const [, y, m, d] = match;
-      // 年が2桁の場合は20xx年とみなす
-      const year = y.length === 2 ? `20${y}` : y;
-      return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-    }
-  }
-  return "";
-}
-
-// 合計金額を推定（合計キーワード行→最大金額）
-function extractAmount(text: string): number | undefined {
-  const lines = text.split("\n");
-
-  // 「合計」「総額」「金額」などのキーワードを含む行を優先的に検索
-  for (let i = 0; i < lines.length; i++) {
-    if (/合計|総額|金額|支払金額|請求金額/.test(lines[i])) {
-      // 同じ行または次の行から金額を抽出
-      const currentLineMatch = lines[i].match(/[¥￥]?(\d{1,3}(,\d{3})*)/);
-      if (currentLineMatch)
-        return parseInt(currentLineMatch[1].replace(/,/g, ""), 10);
-
-      // 次の行を確認（次の行があれば）
-      if (i < lines.length - 1) {
-        const nextLineMatch = lines[i + 1].match(/[¥￥]?(\d{1,3}(,\d{3})*)/);
-        if (nextLineMatch)
-          return parseInt(nextLineMatch[1].replace(/,/g, ""), 10);
-      }
-    }
-  }
-
-  // キーワードが見つからない場合、テキスト中の最大金額を使用
-  const allMatches = [...text.matchAll(/[¥￥]?(\d{1,3}(,\d{3})*)/g)];
-  const numbers = allMatches.map((m) => parseInt(m[1].replace(/,/g, ""), 10));
-  return numbers.length > 0 ? Math.max(...numbers) : undefined;
-}
-
-// T番号（取引番号）を抽出する関数を追加
-function extractTNumber(text: string): string {
-  // T番号のパターンを検出 (例: T12345, T-12345, No.T12345など)
-  const tNumberPatterns = [
-    /[Tt][-\s]?(\d{4,})/, // T1234, T-1234
-    /No\.\s*[Tt][-\s]?(\d{4,})/, // No.T1234
-    /取引番号[：:\s]+([Tt][-\s]?\d{4,}|\d{4,})/, // 取引番号:T1234 または 取引番号:1234
-    /伝票番号[：:\s]+([Tt][-\s]?\d{4,}|\d{4,})/, // 伝票番号:T1234 または 伝票番号:1234
-  ];
-
-  for (const pattern of tNumberPatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return match[1].replace(/\s/g, ""); // スペースを除去
-    }
-  }
-
-  return "";
-}
-
-// 金額付きのすべての行を明細として抽出
-function extractItems(
-  lines: string[]
-): { description: string; price: number }[] {
-  const items: { description: string; price: number }[] = [];
-  for (const line of lines) {
-    const match = /(.+?)\s+[¥￥]?(\d{1,3}(,\d{3})*)円?/.exec(line);
-    if (match) {
-      items.push({
-        description: match[1].trim(),
-        price: parseInt(match[2].replace(/,/g, ""), 10),
-      });
-    }
-  }
-  return items;
 }
