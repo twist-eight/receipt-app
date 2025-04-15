@@ -3,7 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { useReviewLogic } from "../features/receipts/containers/ReviewContainer";
 import ConfirmDialog from "../components/ConfirmDialog";
-import ImageCarousel from "../components/ImageCarousel";
+import ImageCarousel from "../features/ui/components/ImageCarousel";
 import ErrorMessage from "../components/ErrorMessage";
 
 export default function ReviewPage() {

@@ -1,6 +1,6 @@
 import React from "react";
 import { ReceiptItem } from "../types/receipt";
-import ImageCarousel from "./ImageCarousel";
+import ImageCarousel from "../features/ui/components/ImageCarousel";
 
 interface ReceiptCardProps {
   receipt: ReceiptItem;

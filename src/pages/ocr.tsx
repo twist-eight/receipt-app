@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
 import { useClientContext } from "../features/clients/contexts/ClientContext";
-import ImageCarousel from "../components/ImageCarousel";
+import ImageCarousel from "../features/ui/components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ReceiptType } from "../types/receipt";
 import { useOcr } from "../features/ocr/hooks/useOcr";

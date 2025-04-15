@@ -5,7 +5,7 @@ import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext"
 import { usePdfProcessing } from "../features/pdf/hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../types/receipt";
-import ImageCarousel from "../components/ImageCarousel";
+import ImageCarousel from "../features/ui/components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog"; // 追加：確認ダイアログのインポート
 
 export default function GroupPage() {
