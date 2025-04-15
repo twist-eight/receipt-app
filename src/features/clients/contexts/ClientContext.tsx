@@ -6,13 +6,12 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { Client } from "../types";
+import { Client } from "../types/client";
 import { clientService } from "../services/clientService";
 import { useLoading } from "../../../shared/contexts/LoadingContext";
 import { useToast } from "../../../shared/contexts/ToastContext";
 import { useErrorHandler } from "../../../shared/utils/errorHandling";
-import { ApiResponse } from "../../../shared/types";
-
+import { ApiResponse } from "../../receipts/types";
 interface ClientContextType {
   clients: Client[];
   setClients: (clients: Client[]) => void;
