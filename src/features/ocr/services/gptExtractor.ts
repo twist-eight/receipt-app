@@ -201,6 +201,15 @@ function parseResponse(content: string): ExtractedData {
     // JSONレスポンスをパース
     const parsed = JSON.parse(content);
 
+    // T番号の修正 - "T1"で始まり15文字の場合、"T"の後の"1"を削除
+    if (
+      parsed.tNumber &&
+      parsed.tNumber.startsWith("T1") &&
+      parsed.tNumber.length === 15
+    ) {
+      parsed.tNumber = "T" + parsed.tNumber.substring(2);
+    }
+
     // 金額が文字列で返ってきた場合は数値に変換
     if (parsed.amount && typeof parsed.amount === "string") {
       parsed.amount = parseInt(parsed.amount.replace(/[^\d]/g, ""), 10);
