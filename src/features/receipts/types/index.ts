@@ -85,6 +85,8 @@ export interface ReceiptItem {
   subType?: string;
   isConfirmed?: boolean;
   clientId?: string;
+  tNumber?: string; // T番号を追加
+  isOcrProcessed?: boolean; // OCR処理済みフラグを追加
 }
 
 // 領収書タイプの厳格な型定義

@@ -12,14 +12,16 @@ export interface ReceiptItem {
   updatedAt: string;
   vendor: string;
   amount: number;
-  type: ReceiptType; // string から ReceiptType に変更
+  type: ReceiptType;
   memo: string;
   tag: string;
-  status: ReceiptStatus; // string から ReceiptStatus に変更
+  status: ReceiptStatus;
   transferType?: TransferType;
   subType?: string;
   isConfirmed?: boolean;
-  clientId?: string; // index.ts に合わせて追加
+  clientId?: string;
+  tNumber?: string; // T番号を追加
+  isOcrProcessed?: boolean; // OCR処理済みフラグを追加
 }
 
 export type ReceiptType = "領収書" | "明細書" | "契約書" | "見積書" | "通帳";

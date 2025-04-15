@@ -394,6 +394,22 @@ export default function ReviewPage() {
                     />
                   </div>
 
+                  {/* T番号フィールド - 新規追加 */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      T番号 (インボイス番号)
+                    </label>
+                    <input
+                      type="text"
+                      value={currentReceipt.tNumber || ""}
+                      placeholder="T番号"
+                      onChange={(e) =>
+                        handleUpdateField("tNumber", e.target.value)
+                      }
+                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
                   {/* ステータスチェックボックス */}
                   <div className="md:col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">
@@ -537,6 +553,9 @@ export default function ReviewPage() {
                     金額
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    T番号
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     種類
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -578,7 +597,9 @@ export default function ReviewPage() {
                           ? `¥${receipt.amount.toLocaleString()}`
                           : "未設定"}
                       </td>
-
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        {receipt.tNumber || "未設定"}
+                      </td>
                       <td className="px-4 py-2 whitespace-nowrap text-sm">
                         {receipt.type || "領収書"}
                       </td>

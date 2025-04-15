@@ -27,6 +27,9 @@ export default function GroupPage() {
   ];
   const [cardSize, setCardSize] = useState("medium");
 
+  // OCR処理済みでないアイテムだけを表示するようにフィルタリング
+  const filteredReceipts = receipts.filter((item) => !item.isOcrProcessed);
+
   // アイテムの選択/選択解除
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) =>
@@ -114,6 +117,7 @@ export default function GroupPage() {
         memo: `グループ化されたドキュメント`,
         tag: selectedItems[0].tag,
         status: selectedItems[0].status,
+        isOcrProcessed: false, // OCR処理済みフラグを初期化
       };
 
       // 追加: サムネイルをセッションストレージに保存
@@ -275,7 +279,6 @@ export default function GroupPage() {
       </div>
 
       {/* アイテム一覧 - カードサイズに応じてグリッドを調整 */}
-
       <div
         className={`grid ${
           cardSize === "small"
@@ -285,7 +288,7 @@ export default function GroupPage() {
             : "grid-cols-1 lg:grid-cols-2"
         } gap-4`}
       >
-        {receipts.map((item) => (
+        {filteredReceipts.map((item) => (
           <div
             key={item.id}
             className={`border p-4 rounded cursor-pointer transition-all relative ${
@@ -369,9 +372,14 @@ export default function GroupPage() {
         ))}
       </div>
 
-      {receipts.length === 0 && (
+      {filteredReceipts.length === 0 && (
         <div className="text-center p-8 bg-gray-100 rounded-lg">
-          <p>アップロードされたドキュメントがありません。</p>
+          <p>
+            表示できるドキュメントがありません。
+            {receipts.length > 0
+              ? "すべてのドキュメントがOCR処理済みです。"
+              : "アップロードしてください。"}
+          </p>
           <button
             onClick={() => router.push("/upload")}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"

@@ -88,7 +88,9 @@ export default function OcrPage() {
   useEffect(() => {
     // 初回のみ実行し、それ以降はスキップ
     if (!initializedRef.current && receipts.length > 0) {
-      setSelectedIds(receipts.map((item) => item.id));
+      setSelectedIds(
+        receipts.filter((item) => !item.isOcrProcessed).map((item) => item.id)
+      );
       initializedRef.current = true;
     }
   }, [receipts]);
@@ -186,8 +188,10 @@ export default function OcrPage() {
   // 表示するアイテムをフィルタリング
   const filteredReceipts =
     typeFilter === null
-      ? receipts
-      : receipts.filter((item) => item.type === typeFilter);
+      ? receipts.filter((item) => !item.isOcrProcessed)
+      : receipts.filter(
+          (item) => item.type === typeFilter && !item.isOcrProcessed
+        );
 
   return (
     <div className="max-w-5xl mx-auto p-6 pb-24">
@@ -424,15 +428,20 @@ export default function OcrPage() {
         ))}
       </div>
 
-      {receipts.length === 0 && (
+      {filteredReceipts.length === 0 && (
         <div className="text-center p-8 bg-gray-100 rounded-lg">
-          <p>処理対象のドキュメントがありません。</p>
+          <p>
+            処理対象のドキュメントがありません。
+            {receipts.length > 0
+              ? "すべてのドキュメントがOCR処理済みです。"
+              : "アップロードしてください。"}
+          </p>
           <button
-            onClick={() => router.push("/group")}
+            onClick={() => router.push("/upload")}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             type="button"
           >
-            グループ化ページへ
+            アップロードページへ
           </button>
         </div>
       )}
