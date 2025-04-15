@@ -1,6 +1,6 @@
 // src/components/OcrSettings.tsx
 import React, { useState, useEffect } from "react";
-import { useToast } from "../components/ToastContext"; // トースト通知を利用する
+import { useToast } from "../../../shared/contexts/ToastContext"; // トースト通知を利用する
 
 export interface OcrConfigSettings {
   apiKey: string;

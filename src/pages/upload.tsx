@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link"; // 追加
 import FileUploader from "../components/FileUploader";
-import { usePdfProcessing } from "../hooks/usePdfProcessing";
-import { useReceiptContext } from "../contexts/ReceiptContext";
-import { useClientContext } from "../contexts/ClientContext"; // 追加
+import { usePdfProcessing } from "../features/pdf/hooks/usePdfProcessing";
+import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
+import { useClientContext } from "../features/clients/contexts/ClientContext"; // 追加
 import { ReceiptType, TransferType } from "../types/receipt"; // TransferTypeを追加
 
 export default function UploadPage() {

@@ -1,8 +1,11 @@
 // src/pages/export.tsx
 import { useState, useEffect, useMemo } from "react";
-import { useReceiptContext } from "../contexts/ReceiptContext";
-import { useClientContext } from "../contexts/ClientContext";
-import { useSupabaseSync, SupabaseSyncOptions } from "../hooks/useSupabaseSync";
+import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
+import {
+  useSupabaseSync,
+  SupabaseSyncOptions,
+} from "../features/supabase/hooks/useSupabaseSync";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Link from "next/link";
 

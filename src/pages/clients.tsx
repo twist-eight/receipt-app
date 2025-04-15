@@ -1,7 +1,7 @@
 // src/pages/clients.tsx
 import { useState } from "react";
-import { useClientContext } from "../contexts/ClientContext";
-import { Client, DocumentTypeConfig } from "../types/client";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
+import { Client, DocumentTypeConfig } from "../features/clients/types/client";
 import { v4 as uuidv4 } from "uuid";
 
 export default function ClientsPage() {

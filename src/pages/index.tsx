@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useClientContext } from "../contexts/ClientContext";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
 import { useEffect, useState } from "react";
 
 export default function Home() {

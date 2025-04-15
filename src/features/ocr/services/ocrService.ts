@@ -1,4 +1,3 @@
-// src/utils/ocrService.ts
 // Google Cloud Vision API用に完全修正 + 結果パース精度向上（実レシート対応強化）
 
 // OCR結果の型定義

@@ -2,8 +2,8 @@
 import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import Link from "next/link";
-import AppProviders from "../components/AppProviders";
-import { useClientContext } from "../contexts/ClientContext";
+import AppProviders from "../shared/components/AppProviders";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (

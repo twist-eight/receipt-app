@@ -1,8 +1,8 @@
 // src/components/AppProviders.tsx
 import React, { ReactNode } from "react";
-import { ClientProvider } from "../contexts/ClientContext";
-import { ReceiptProvider } from "../contexts/ReceiptContext";
-import { ToastProvider } from "../components/ToastContext";
+import { ClientProvider } from "../../features/clients/contexts/ClientContext";
+import { ReceiptProvider } from "../../features/receipts/contexts/ReceiptContext";
+import { ToastProvider } from "../contexts/ToastContext";
 import { LoadingProvider } from "../contexts/LoadingContext";
 
 interface AppProvidersProps {

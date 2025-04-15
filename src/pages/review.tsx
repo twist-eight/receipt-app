@@ -1,7 +1,7 @@
 // src/pages/review.tsx
 import React from "react";
 import Link from "next/link";
-import { useReviewLogic } from "../containers/ReviewContainer";
+import { useReviewLogic } from "../features/receipts/containers/ReviewContainer";
 import ConfirmDialog from "../components/ConfirmDialog";
 import ImageCarousel from "../components/ImageCarousel";
 import ErrorMessage from "../components/ErrorMessage";

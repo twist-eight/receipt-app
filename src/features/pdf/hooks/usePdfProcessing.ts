@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { v4 as uuidv4 } from "uuid";
-import { ReceiptItem } from "../types/receipt";
+import { ReceiptItem } from "../../../types/receipt";
 
 // PDFワーカーの設定
 if (typeof window !== "undefined") {

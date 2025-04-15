@@ -2,13 +2,13 @@
 // import部分は変更なし
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
-import { useReceiptContext } from "../contexts/ReceiptContext";
-import { useClientContext } from "../contexts/ClientContext";
+import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
 import ImageCarousel from "../components/ImageCarousel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ReceiptType } from "../types/receipt";
-import { useOcr } from "../hooks/useOcr";
-import OcrResultDisplay from "../components/OcrResultDisplay"; // 追加
+import { useOcr } from "../features/ocr/hooks/useOcr";
+import OcrResultDisplay from "../features/ocr/components/OcrResultDisplay"; // 追加
 import Image from "next/image";
 
 export default function OcrPage() {

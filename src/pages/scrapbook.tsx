@@ -1,7 +1,7 @@
 // src/pages/scrapbook.tsx
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
-import { useClientContext } from "../contexts/ClientContext";
+import { useClientContext } from "../features/clients/contexts/ClientContext";
 import { fetchSavedReceipts } from "../utils/receiptApi";
 import { ReceiptItem } from "../types/receipt";
 import LoadingSpinner from "../components/LoadingSpinner";

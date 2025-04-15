@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
-import { OCRResult, OCROptions, ReceiptItem } from "../types";
-import { useLoading } from "../contexts/LoadingContext";
-import { useToast } from "../components/ToastContext";
-import { useErrorHandler } from "../utils/errorHandling";
-import { processImageWithOCR } from "../utils/ocrService";
+import { OCRResult, OCROptions, ReceiptItem } from "../../receipts/types";
+import { useLoading } from "../../../shared/contexts/LoadingContext";
+import { useToast } from "../../../shared/contexts/ToastContext";
+import { useErrorHandler } from "../../../shared/utils/errorHandling";
+import { processImageWithOCR } from "../services/ocrService";
 
 // OCRサービスのモックインポート（実際の実装は適宜置き換え）
 /*

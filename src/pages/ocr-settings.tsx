@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import OcrSettings, { OcrConfigSettings } from "../components/OcrSettings";
+import OcrSettings, {
+  OcrConfigSettings,
+} from "../features/ocr/components/OcrSettings";
 import Link from "next/link";
 
 export default function OcrSettingsPage() {

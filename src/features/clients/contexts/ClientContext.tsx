@@ -1,4 +1,4 @@
-// src/contexts/ClientContext.tsx
+// src/features/clients/contexts/ClientContext.tsx
 import React, {
   createContext,
   useContext,
@@ -8,9 +8,10 @@ import React, {
 } from "react";
 import { Client } from "../types";
 import { clientService } from "../services/clientService";
-import { useLoading } from "./LoadingContext";
-import { useToast } from "../components/ToastContext";
-import { useErrorHandler } from "../utils/errorHandling";
+import { useLoading } from "../../../shared/contexts/LoadingContext";
+import { useToast } from "../../../shared/contexts/ToastContext";
+import { useErrorHandler } from "../../../shared/utils/errorHandling";
+import { ApiResponse } from "../../../shared/types";
 
 interface ClientContextType {
   clients: Client[];
@@ -24,7 +25,7 @@ interface ClientContextType {
   isLoading: boolean;
   error: string | null;
   clearError: () => void;
-  refreshClients: () => Promise<void>;
+  refreshClients: () => Promise<ApiResponse<void>>; // 戻り値型を修正
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
@@ -125,8 +126,11 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
       const response = await clientService.updateClient(id, updates);
 
       if (response.success && response.data) {
+        // 修正: 型アサーションを追加して(Client | undefined)[]の問題を解決
         setClients((prev) =>
-          prev.map((client) => (client.id === id ? response.data : client))
+          prev.map((client) =>
+            client.id === id ? (response.data as Client) : client
+          )
         );
         addToast("顧問先情報を更新しました", "success");
       } else {
@@ -186,7 +190,7 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // コンテキスト値の作成
-  const value = {
+  const value: ClientContextType = {
     clients,
     setClients,
     addClient,

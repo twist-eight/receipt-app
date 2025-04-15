@@ -1,8 +1,8 @@
 // src/hooks/useSupabaseSync.ts
 import { useState } from "react";
-import { ReceiptItem } from "../types/receipt";
-import { Client } from "../types/client";
-import { supabase } from "../utils/supabaseClient";
+import { ReceiptItem } from "../../../types/receipt";
+import { Client } from "../../clients/types/client";
+import { supabase } from "../../../lib/supabaseClient";
 import * as pdfjsLib from "pdfjs-dist";
 
 // PDFワーカーの設定

@@ -2,11 +2,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../contexts/ReceiptContext";
-import { useClientContext } from "../contexts/ClientContext";
-import { useReloadWarning } from "../hooks/useReloadWarning";
-import { useErrorHandler } from "../utils/errorHandling";
-import { useLoading } from "../contexts/LoadingContext";
-import { useToast } from "../components/ToastContext";
+import { useClientContext } from "../../clients/contexts/ClientContext";
+import { useReloadWarning } from "../../../hooks/useReloadWarning";
+import { useErrorHandler } from "../../../shared/utils/errorHandling";
+import { useLoading } from "../../../shared/contexts/LoadingContext";
+import { useToast } from "../../../shared/contexts/ToastContext";
 import { ReceiptItem, ReceiptType, TransferType } from "../types";
 
 export function useReviewLogic() {

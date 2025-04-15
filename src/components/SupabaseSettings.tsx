@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../utils/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 
 interface SupabaseSettingsProps {
   onSave: (settings: SupabaseConfigSettings) => void;

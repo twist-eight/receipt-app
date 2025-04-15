@@ -1,6 +1,6 @@
 // src/components/OcrResultDisplay.tsx
 import React from "react";
-import { OCRResult } from "../utils/ocrService";
+import { OCRResult } from "../services/ocrService";
 import Image from "next/image";
 
 interface OcrResultDisplayProps {

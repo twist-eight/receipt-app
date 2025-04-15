@@ -1,5 +1,5 @@
 // src/utils/receiptApi.ts
-import { supabase } from "./supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 import { ReceiptItem } from "../types/receipt";
 import { v4 as uuidv4 } from "uuid";
 

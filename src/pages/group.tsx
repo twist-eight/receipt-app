@@ -1,8 +1,8 @@
 // src/pages/group.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { useReceiptContext } from "../contexts/ReceiptContext";
-import { usePdfProcessing } from "../hooks/usePdfProcessing";
+import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
+import { usePdfProcessing } from "../features/pdf/hooks/usePdfProcessing";
 import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../types/receipt";
 import ImageCarousel from "../components/ImageCarousel";

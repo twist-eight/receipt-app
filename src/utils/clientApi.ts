@@ -1,6 +1,6 @@
 // src/utils/clientApi.ts
-import { supabase } from "./supabaseClient";
-import { Client, DocumentTypeConfig } from "../types/client";
+import { supabase } from "../lib/supabaseClient";
+import { Client, DocumentTypeConfig } from "../features/clients/types/client";
 
 // Supabaseのデータベーステーブルの型を定義
 interface ClientDatabaseRecord {

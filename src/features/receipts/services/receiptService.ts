@@ -1,5 +1,5 @@
 // src/services/receiptService.ts
-import { supabase } from "../utils/supabaseClient";
+import { supabase } from "../../../lib/supabaseClient";
 import { ApiResponse, ReceiptItem, FilterOptions } from "../types";
 
 /**

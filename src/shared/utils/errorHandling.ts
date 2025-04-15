@@ -1,6 +1,6 @@
 // src/utils/errorHandling.ts
-import { ApiResponse, ErrorState } from "../types";
-import { useToast } from "../components/ToastContext";
+import { ApiResponse, ErrorState } from "../../features/receipts/types";
+import { useToast } from "../contexts/ToastContext";
 
 /**
  * エラーメッセージを標準化するユーティリティ
