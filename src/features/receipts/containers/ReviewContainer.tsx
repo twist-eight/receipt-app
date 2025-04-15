@@ -44,17 +44,30 @@ export function useReviewLogic() {
   }, [receipts, confirmedItems]);
 
   // 現在のレシート - 未確認のもののみから選択
-  const currentReceipt = useMemo(
-    () => unconfirmedReceipts[currentIndex] || null,
-    [unconfirmedReceipts, currentIndex]
-  );
+  const currentReceipt = useMemo(() => {
+    const current = unconfirmedReceipts[currentIndex] || null;
+
+    // デバッグ情報
+    if (current) {
+      console.log(`現在表示中のレシート: ${current.id}`, current);
+    } else if (unconfirmedReceipts.length > 0) {
+      console.log(
+        `レシート選択エラー: index=${currentIndex}, total=${unconfirmedReceipts.length}`
+      );
+    }
+
+    return current;
+  }, [unconfirmedReceipts, currentIndex]);
 
   // データが存在しない場合のインデックス調整
   useEffect(() => {
     if (unconfirmedReceipts.length === 0) {
       setCurrentIndex(0);
+      console.log("未確認レシートがありません");
     } else if (currentIndex >= unconfirmedReceipts.length) {
-      setCurrentIndex(Math.max(0, unconfirmedReceipts.length - 1));
+      const newIndex = Math.max(0, unconfirmedReceipts.length - 1);
+      console.log(`インデックス調整: ${currentIndex} → ${newIndex}`);
+      setCurrentIndex(newIndex);
     }
   }, [unconfirmedReceipts, currentIndex]);
 

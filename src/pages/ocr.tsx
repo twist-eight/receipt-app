@@ -8,6 +8,7 @@ import ConfirmDialog from "../shared/components/ConfirmDialog";
 import { ReceiptType } from "../features/receipts/types/receipt";
 import { useOcr } from "../features/ocr/hooks/useOcr";
 import Image from "next/image";
+import { ReceiptItem } from "../features/receipts/types";
 
 export default function OcrPage() {
   const router = useRouter();
@@ -23,10 +24,8 @@ export default function OcrPage() {
   // useOcrフックを使用
   const {
     processMultipleReceipts,
-    applyOcrResults,
     isProcessing: ocrIsProcessing,
     processedCount: ocrProcessedCount,
-    ocrResults,
     error: ocrError,
   } = useOcr();
 
@@ -165,20 +164,56 @@ export default function OcrPage() {
         selectedIds.includes(item.id)
       );
 
-      // OCR処理を実行
-      await processMultipleReceipts(selectedItems);
+      // OCR処理を実行し、直接結果を受け取る
+      const ocrResultsMap = await processMultipleReceipts(selectedItems);
 
-      // ここを変更: OCR処理後に自動的に結果を適用
-      // 選択されたすべてのアイテムにOCR結果を適用
-      selectedItems.forEach((receipt) => {
-        if (ocrResults[receipt.id]) {
-          const updates = applyOcrResults(receipt.id, ocrResults[receipt.id]);
-          updateReceipt(receipt.id, updates);
+      console.log("OCR処理完了、結果を適用します");
+      console.log(
+        "処理対象アイテム:",
+        selectedItems.map((i) => i.id)
+      );
+      console.log("OCR結果:", ocrResultsMap);
+
+      // ローカルの結果を直接使用
+      let updatedCount = 0;
+
+      for (const item of selectedItems) {
+        const result = ocrResultsMap[item.id];
+
+        if (result) {
+          console.log(`${item.id}の結果を適用します:`, result);
+
+          // 更新する値を作成
+          const updates: Partial<ReceiptItem> = {
+            vendor: result.vendor || item.vendor,
+            date: result.date || item.date,
+            amount: result.amount !== undefined ? result.amount : item.amount,
+            tNumber: result.tNumber || "",
+            memo: result.text
+              ? `OCR結果: ${result.text.substring(
+                  0,
+                  Math.min(200, result.text.length)
+                )}${result.text.length > 200 ? "..." : ""}`
+              : item.memo,
+            isOcrProcessed: true,
+            status: "完了",
+          };
+
+          // 更新を適用
+          console.log(`${item.id}の更新内容:`, updates);
+          updateReceipt(item.id, updates);
+          updatedCount++;
+        } else {
+          console.warn(`${item.id}のOCR結果が見つかりません`);
         }
-      });
+      }
 
-      // 処理完了後、レビューページへ直接移動
-      router.push("/review");
+      console.log(`${updatedCount}件のアイテムを更新しました`);
+
+      // 変更を確実に反映させるために少し待機してからページ遷移
+      setTimeout(() => {
+        router.push("/review");
+      }, 500);
     } catch (err) {
       console.error("OCR処理中にエラーが発生:", err);
       setError("OCR処理中にエラーが発生しました");

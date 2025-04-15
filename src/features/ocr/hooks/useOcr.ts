@@ -44,7 +44,7 @@ interface UseOcrReturn {
   processMultipleReceipts: (
     receipts: ReceiptItem[],
     options?: OCROptions
-  ) => Promise<void>;
+  ) => Promise<Record<string, OCRResult>>;
   applyOcrResults: (
     receiptId: string,
     results: OCRResult
@@ -172,13 +172,14 @@ export function useOcr(): UseOcrReturn {
   };
 
   // 複数の受領書を処理する関数 - パフォーマンス最適化済み
+  // 複数の受領書を処理する関数
   const processMultipleReceipts = async (
     receipts: ReceiptItem[],
     options: OCROptions = {}
-  ) => {
+  ): Promise<Record<string, OCRResult>> => {
     if (receipts.length === 0) {
       setError("処理する受領書がありません");
-      return;
+      return {};
     }
 
     startLoading(`OCR処理を開始: 0/${receipts.length}`);
@@ -187,74 +188,72 @@ export function useOcr(): UseOcrReturn {
     setProcessedCount(0);
     setTotalCount(receipts.length);
 
-    const newResults: Record<string, OCRResult> = {};
+    // 結果を保存するローカルオブジェクト
+    const resultsMap: Record<string, OCRResult> = {};
     let hasError = false;
 
     try {
-      // バッチサイズを定義（同時に多すぎるとAPIの制限に引っかかる可能性あり）
+      // バッチサイズを定義
       const batchSize = 3;
 
-      // バッチ処理ユーティリティ関数
-      const processBatch = async (batch: ReceiptItem[], startIndex: number) => {
-        const batchResults = await Promise.all(
-          batch.map(async (receipt, index) => {
-            try {
-              if (!receipt.imageUrls || receipt.imageUrls.length === 0) {
-                console.warn(`Receipt ${receipt.id} has no images, skipping.`);
-                return { id: receipt.id, result: null, success: false };
-              }
+      // バッチ処理
+      for (let i = 0; i < receipts.length; i += batchSize) {
+        const batch = receipts.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (receipt, index) => {
+          try {
+            if (!receipt.imageUrls || receipt.imageUrls.length === 0) {
+              console.warn(`Receipt ${receipt.id} has no images, skipping.`);
+              return { id: receipt.id, success: false };
+            }
 
-              const processIndex = startIndex + index;
-              updateLoadingMessage(
-                `OCR処理中: ${processIndex + 1}/${receipts.length}`
-              );
+            const processIndex = i + index;
+            updateLoadingMessage(
+              `OCR処理中: ${processIndex + 1}/${receipts.length}`
+            );
 
-              const imageUrl = receipt.imageUrls[0];
-              // OCR処理を実行
-              const result = await processImageWithOCR(imageUrl, {
-                documentType: receipt.type,
-                ...options,
-              });
+            const imageUrl = receipt.imageUrls[0];
 
-              // サムネイルを生成して保存
-              if (!receipt.thumbnailUrl) {
+            // OCR処理を実行
+            console.log(`OCR処理開始: ${receipt.id}`);
+            const result = await processImageWithOCR(imageUrl, {
+              documentType: receipt.type,
+              ...options,
+            });
+
+            console.log(`OCR処理完了: ${receipt.id}`, result);
+
+            // 結果をローカル変数に保存
+            if (result) {
+              resultsMap[receipt.id] = result;
+            }
+
+            // サムネイル生成
+            if (!receipt.thumbnailUrl) {
+              try {
                 const thumbnailUrl = await generateThumbnail(imageUrl);
                 if (thumbnailUrl) {
-                  // サムネイルを保存
                   sessionStorage.setItem(
                     `thumbnail_${receipt.id}`,
                     thumbnailUrl
                   );
                 }
+              } catch (thumbnailErr) {
+                console.error(`サムネイル生成エラー:`, thumbnailErr);
               }
-
-              return { id: receipt.id, result, success: true };
-            } catch (err) {
-              console.error(
-                `OCR processing failed for receipt ${receipt.id}:`,
-                err
-              );
-              return { id: receipt.id, result: null, success: false };
             }
-          })
-        );
 
-        return batchResults;
-      };
-
-      // バッチに分けて処理
-      for (let i = 0; i < receipts.length; i += batchSize) {
-        const batch = receipts.slice(i, i + batchSize);
-        const batchResults = await processBatch(batch, i);
-
-        // 結果を処理
-        batchResults.forEach(({ id, result, success }) => {
-          if (success && result) {
-            newResults[id] = result;
-          } else {
-            hasError = true;
+            return { id: receipt.id, success: true };
+          } catch (err) {
+            console.error(`OCR処理失敗 (${receipt.id}):`, err);
+            return { id: receipt.id, success: false };
           }
         });
+
+        // バッチのすべての処理を待機
+        const batchResults = await Promise.all(batchPromises);
+
+        // エラー状態を更新
+        hasError = hasError || batchResults.some((r) => !r.success);
 
         // 進捗を更新
         const processedSoFar = Math.min(i + batchSize, receipts.length);
@@ -262,26 +261,28 @@ export function useOcr(): UseOcrReturn {
         updateProgress(processedSoFar, receipts.length);
       }
 
-      // 全ての結果を保存
-      setOcrResults((prev) => ({
-        ...prev,
-        ...newResults,
-      }));
+      // 結果をステートに保存
+      setOcrResults((prev) => {
+        const updatedResults = { ...prev, ...resultsMap };
+        console.log("OCR結果をステートに保存:", updatedResults);
+        return updatedResults;
+      });
 
-      // エラーがあれば通知
       if (hasError) {
-        setError(
-          "一部の処理で問題が発生しました。詳細はコンソールを確認してください。"
-        );
+        setError("一部の処理で問題が発生しました");
         addToast("一部のOCR処理が失敗しました", "warning");
       } else {
         addToast(`${receipts.length}件のOCR処理が完了しました`, "success");
       }
+
+      // 結果オブジェクトを直接返す
+      return resultsMap;
     } catch (err) {
       handleError(err, {
         fallbackMessage: "OCR処理に失敗しました",
         showToast: true,
       });
+      return {};
     } finally {
       setIsProcessing(false);
       stopLoading();
@@ -291,8 +292,13 @@ export function useOcr(): UseOcrReturn {
   // OCR結果から更新データを作成
   const applyOcrResults = useCallback(
     (receiptId: string, results: OCRResult): Partial<ReceiptItem> => {
-      const updates: Partial<ReceiptItem> = {};
+      // 明示的に初期化した更新オブジェクト
+      const updates: Partial<ReceiptItem> = {
+        isOcrProcessed: true, // OCR処理済みフラグを設定
+        status: "完了", // デフォルトのステータスを設定
+      };
 
+      // 各フィールドを明示的に設定
       if (results.vendor) {
         updates.vendor = results.vendor;
       }
@@ -310,9 +316,6 @@ export function useOcr(): UseOcrReturn {
         updates.tNumber = results.tNumber;
       }
 
-      // OCR処理済みフラグをセット
-      updates.isOcrProcessed = true;
-
       // 元のテキスト全体をメモに保存
       if (results.text) {
         // メモにOCRのテキスト概要を入れる
@@ -324,6 +327,7 @@ export function useOcr(): UseOcrReturn {
         updates.memo = `OCR結果: ${textSummary}`;
       }
 
+      console.log(`OCR結果を変換: ${receiptId}`, updates);
       return updates;
     },
     []

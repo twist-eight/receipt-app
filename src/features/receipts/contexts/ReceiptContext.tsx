@@ -66,12 +66,56 @@ export const ReceiptProvider: React.FC<ReceiptProviderProps> = ({
     setReceipts((prev) => [...prev, ...newReceipts]);
   };
 
+  // 更新関数を改善
   const updateReceipt = (id: string, updates: Partial<ReceiptItem>) => {
-    setReceipts((prev) =>
-      prev.map((receipt) =>
-        receipt.id === id ? { ...receipt, ...updates } : receipt
-      )
-    );
+    setReceipts((prev) => {
+      // 更新対象のレシートを見つける
+      const targetIndex = prev.findIndex((receipt) => receipt.id === id);
+      if (targetIndex === -1) {
+        console.warn(`ID=${id}のレシートが見つかりません`);
+        return prev; // 見つからない場合は何もしない
+      }
+
+      // 新しい配列を作成
+      const newReceipts = [...prev];
+
+      // 既存のレシートと更新を確実にマージ
+      const oldReceipt = newReceipts[targetIndex];
+      const updatedReceipt = {
+        ...oldReceipt,
+        ...updates,
+        // 特定のフィールドを明示的に更新
+        vendor:
+          updates.vendor !== undefined ? updates.vendor : oldReceipt.vendor,
+        date: updates.date !== undefined ? updates.date : oldReceipt.date,
+        amount:
+          updates.amount !== undefined ? updates.amount : oldReceipt.amount,
+        memo: updates.memo !== undefined ? updates.memo : oldReceipt.memo,
+        tNumber:
+          updates.tNumber !== undefined ? updates.tNumber : oldReceipt.tNumber,
+        status: updates.status || oldReceipt.status,
+        updatedAt: new Date().toISOString().split("T")[0], // 更新日時を確実に設定
+      };
+
+      // 配列を更新
+      newReceipts[targetIndex] = updatedReceipt;
+
+      // デバッグ情報
+      console.log(`レシート更新: ID=${id}`, {
+        before: oldReceipt,
+        updates: updates,
+        after: updatedReceipt,
+      });
+
+      // セッションストレージに即時保存
+      try {
+        sessionStorage.setItem("ocrResults", JSON.stringify(newReceipts));
+      } catch (e) {
+        console.error("セッションストレージへの保存に失敗:", e);
+      }
+
+      return newReceipts;
+    });
   };
 
   const removeReceipt = (id: string) => {
