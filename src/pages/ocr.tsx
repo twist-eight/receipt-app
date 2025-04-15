@@ -1,5 +1,4 @@
 // src/pages/ocr.tsx
-// import部分は変更なし
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { useReceiptContext } from "../features/receipts/contexts/ReceiptContext";
@@ -8,7 +7,6 @@ import ImageCarousel from "../features/ui/components/ImageCarousel";
 import ConfirmDialog from "../shared/components/ConfirmDialog";
 import { ReceiptType } from "../features/receipts/types/receipt";
 import { useOcr } from "../features/ocr/hooks/useOcr";
-import OcrResultDisplay from "../features/ocr/components/OcrResultDisplay"; // 追加
 import Image from "next/image";
 
 export default function OcrPage() {
@@ -21,10 +19,6 @@ export default function OcrPage() {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(
-    null
-  ); // 詳細表示用
-  const [showResults, setShowResults] = useState(false); // 結果表示フラグ
 
   // useOcrフックを使用
   const {
@@ -32,7 +26,6 @@ export default function OcrPage() {
     applyOcrResults,
     isProcessing: ocrIsProcessing,
     processedCount: ocrProcessedCount,
-    //totalCount,
     ocrResults,
     error: ocrError,
   } = useOcr();
@@ -84,7 +77,6 @@ export default function OcrPage() {
     } else if (isProcessing && !ocrIsProcessing) {
       // OCR処理が完了したら状態を更新
       setIsProcessing(false);
-      setShowResults(true); // 処理完了後に結果を表示
     }
 
     if (ocrError) {
@@ -164,7 +156,6 @@ export default function OcrPage() {
     }
 
     setError(null);
-    setShowResults(false); // 結果表示をリセット
 
     try {
       // 選択されたアイテムのみ処理
@@ -175,42 +166,21 @@ export default function OcrPage() {
       // OCR処理を実行
       await processMultipleReceipts(selectedItems);
 
-      // 処理が完了したら最初のアイテムを選択
-      if (selectedItems.length > 0) {
-        setSelectedReceiptId(selectedItems[0].id);
-      }
+      // ここを変更: OCR処理後に自動的に結果を適用
+      // 選択されたすべてのアイテムにOCR結果を適用
+      selectedItems.forEach((receipt) => {
+        if (ocrResults[receipt.id]) {
+          const updates = applyOcrResults(receipt.id, ocrResults[receipt.id]);
+          updateReceipt(receipt.id, updates);
+        }
+      });
+
+      // 処理完了後、レビューページへ直接移動
+      router.push("/review");
     } catch (err) {
       console.error("OCR処理中にエラーが発生:", err);
       setError("OCR処理中にエラーが発生しました");
     }
-  };
-
-  // OCR結果を適用する
-  const applyOcrResult = (receiptId: string) => {
-    if (ocrResults[receiptId]) {
-      const updates = applyOcrResults(receiptId, ocrResults[receiptId]);
-      updateReceipt(receiptId, {
-        ...updates,
-        // サムネイルURLがある場合は保持
-        thumbnailUrl:
-          sessionStorage.getItem(`thumbnail_${receiptId}`) ||
-          receipts.find((r) => r.id === receiptId)?.thumbnailUrl,
-      });
-    }
-  };
-
-  // 全ての結果を適用
-  const applyAllResults = () => {
-    selectedIds.forEach((id) => {
-      if (ocrResults[id]) {
-        applyOcrResult(id);
-      }
-    });
-
-    alert(`${Object.keys(ocrResults).length}件のOCR結果を適用しました`);
-
-    // 処理完了後、レビューページへ
-    router.push("/review");
   };
 
   // 表示するアイテムをフィルタリング
@@ -218,25 +188,6 @@ export default function OcrPage() {
     typeFilter === null
       ? receipts
       : receipts.filter((item) => item.type === typeFilter);
-
-  // 現在選択中のレシート - 使用するか削除します
-  /*
-const selectedReceipt = selectedReceiptId 
-  ? receipts.find(r => r.id === selectedReceiptId) 
-  : null;
-*/
-  // サムネイルURLを取得
-  const getThumbnailUrl = (receiptId: string): string | undefined => {
-    // セッションストレージから取得を試みる
-    const storedThumbnail = sessionStorage.getItem(`thumbnail_${receiptId}`);
-    if (storedThumbnail) {
-      return storedThumbnail;
-    }
-
-    // レシートのプロパティから取得
-    const receipt = receipts.find((r) => r.id === receiptId);
-    return receipt?.thumbnailUrl || undefined;
-  };
 
   return (
     <div className="max-w-5xl mx-auto p-6 pb-24">
@@ -338,50 +289,6 @@ const selectedReceipt = selectedReceiptId
           }}
           onCancel={() => setIsConfirmDialogOpen(false)}
         />
-      )}
-
-      {/* OCR結果表示セクション - 処理完了後に表示 */}
-      {showResults && Object.keys(ocrResults).length > 0 && (
-        <div className="mb-8 bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">OCR処理結果</h2>
-
-          {/* タブ形式で結果選択 */}
-          <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto border-b pb-2">
-            {selectedIds.map((id) => (
-              <button
-                key={id}
-                onClick={() => setSelectedReceiptId(id)}
-                className={`px-3 py-1 text-sm rounded ${
-                  selectedReceiptId === id
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-              >
-                {receipts.find((r) => r.id === id)?.vendor ||
-                  `ID: ${id.substring(0, 6)}...`}
-              </button>
-            ))}
-          </div>
-
-          {/* 選択中のレシートの結果表示 */}
-          {selectedReceiptId && ocrResults[selectedReceiptId] && (
-            <OcrResultDisplay
-              result={ocrResults[selectedReceiptId]}
-              thumbnailUrl={getThumbnailUrl(selectedReceiptId)}
-              onApply={() => applyOcrResult(selectedReceiptId)}
-            />
-          )}
-
-          {/* 全て適用ボタン */}
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={applyAllResults}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              すべての結果を適用してレビューへ進む
-            </button>
-          </div>
-        </div>
       )}
 
       {/* 処理対象ドキュメント一覧 - カードサイズに応じてグリッドを調整 */}

@@ -289,6 +289,7 @@ export function useOcr(): UseOcrReturn {
   };
 
   // OCR結果から更新データを作成
+
   const applyOcrResults = useCallback(
     (receiptId: string, results: OCRResult): Partial<ReceiptItem> => {
       const updates: Partial<ReceiptItem> = {};
@@ -305,13 +306,22 @@ export function useOcr(): UseOcrReturn {
         updates.amount = results.amount;
       }
 
+      // T番号があればメモに追加
+      if (results.tNumber) {
+        updates.memo = `T番号: ${results.tNumber}`;
+      }
+
+      // 元のテキスト全体をメモに保存（T番号があれば追記）
       if (results.text) {
         // メモにOCRのテキスト概要を入れる
         const textSummary =
           results.text.length > 200
             ? `${results.text.substring(0, 200)}...`
             : results.text;
-        updates.memo = `OCR結果: ${textSummary}`;
+
+        updates.memo = updates.memo
+          ? `${updates.memo}\n\nOCR結果: ${textSummary}`
+          : `OCR結果: ${textSummary}`;
       }
 
       return updates;

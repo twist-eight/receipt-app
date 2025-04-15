@@ -109,6 +109,7 @@ export interface OCRResult {
   vendor?: string;
   date?: string;
   amount?: number;
+  tNumber?: string;
   items?: {
     description: string;
     price: number;

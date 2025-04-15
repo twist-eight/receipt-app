@@ -394,20 +394,6 @@ export default function ReviewPage() {
                     />
                   </div>
 
-                  {/* タグフィールド */}
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      タグ
-                    </label>
-                    <input
-                      type="text"
-                      value={currentReceipt.tag || ""}
-                      placeholder="タグ（交際費など）"
-                      onChange={(e) => handleUpdateField("tag", e.target.value)}
-                      className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
                   {/* ステータスチェックボックス */}
                   <div className="md:col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">

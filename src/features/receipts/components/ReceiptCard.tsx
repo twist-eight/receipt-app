@@ -104,7 +104,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs text-gray-500 mb-1">日付</label>
           <input
@@ -159,17 +159,6 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
             value={receipt.memo}
             placeholder="メモ"
             onChange={(e) => onChange("memo", e.target.value)}
-            className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">タグ</label>
-          <input
-            type="text"
-            value={receipt.tag}
-            placeholder="タグ（交際費など）"
-            onChange={(e) => onChange("tag", e.target.value)}
             className="border p-2 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>

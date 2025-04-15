@@ -6,6 +6,7 @@ export interface OCRResult {
   vendor?: string; // 取引先（ベンダー名）
   date?: string; // 日付（YYYY-MM-DD）
   amount?: number; // 合計金額
+  tNumber?: string; // T番号（取引番号）追加
   items?: {
     description: string; // 商品名や項目名
     price: number; // 金額
@@ -133,15 +134,11 @@ export async function processImageWithOCR(
 
     // パース処理：ベンダー名、日付、金額、明細を抽出
     const lines = extractedText.split("\n");
-    const vendor =
-      lines.find((line) =>
-        /株式会社|有限会社|maruetsu|イオン|ローソン|ファミリーマート|セブン/.test(
-          line
-        )
-      ) || lines[0];
+    const vendor = extractVendor(lines, extractedText);
     const date = extractDate(extractedText);
     const amount = extractAmount(extractedText);
     const items = extractItems(lines);
+    const tNumber = extractTNumber(extractedText); // T番号抽出を追加
 
     return {
       text: extractedText,
@@ -149,6 +146,7 @@ export async function processImageWithOCR(
       date,
       amount,
       items,
+      tNumber,
       confidence: confidenceValue,
     };
   } catch (error) {
@@ -176,28 +174,115 @@ function calculateConfidence(
   }
 }
 
-// 正規表現で日付を抽出（例：2024年 1月 5日 → 2024-01-05）
+// 取引先名を抽出する関数を強化
+function extractVendor(lines: string[], fullText: string): string {
+  // 会社名や店舗名を示す特徴的なパターン
+  const companyPatterns = [
+    /株式会社([\p{L}\d\s]{1,20})/u,
+    /([\p{L}\d\s]{1,20})株式会社/u,
+    /有限会社([\p{L}\d\s]{1,20})/u,
+    /([\p{L}\d\s]{1,20})有限会社/u,
+    /合同会社([\p{L}\d\s]{1,20})/u,
+  ];
+
+  // よく見られる店舗名のパターン
+  const storeNames = [
+    /マルエツ|イオン|ローソン|ファミリーマート|セブン|イトーヨーカドー|ドン・キホーテ|ユニクロ/i,
+  ];
+
+  // 最初に会社名パターンを確認
+  for (const pattern of companyPatterns) {
+    const match = fullText.match(pattern);
+    if (match) {
+      return match[0].trim();
+    }
+  }
+
+  // 次に店舗名パターンを確認
+  for (const pattern of storeNames) {
+    const match = fullText.match(pattern);
+    if (match) {
+      return match[0].trim();
+    }
+  }
+
+  // 特定のパターンが見つからない場合、最初の行をベンダー名とする
+  // ただし短すぎる場合は除外（ヘッダーや日付などの可能性）
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (trimmedLine.length > 3 && !/^\d+[-\/]\d/.test(trimmedLine)) {
+      return trimmedLine;
+    }
+  }
+
+  return lines[0] || "";
+}
+
+// 日付の抽出 - より強化した正規表現パターン
 function extractDate(text: string): string {
-  const datePattern = /(\d{4})[年\/\-]\s*(\d{1,2})[月\/\-]\s*(\d{1,2})日?/;
-  const match = datePattern.exec(text);
-  if (!match) return "";
-  const [, y, m, d] = match;
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  // 複数の日付形式に対応（2024年1月5日、2024/01/05、2024-01-05など）
+  const datePatterns = [
+    /(\d{4})[年\/\-]\s*(\d{1,2})[月\/\-]\s*(\d{1,2})日?/,
+    /(\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/, // YY/MM/DD形式も対応
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const [, y, m, d] = match;
+      // 年が2桁の場合は20xx年とみなす
+      const year = y.length === 2 ? `20${y}` : y;
+      return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+  }
+  return "";
 }
 
 // 合計金額を推定（合計キーワード行→最大金額）
 function extractAmount(text: string): number | undefined {
   const lines = text.split("\n");
+
+  // 「合計」「総額」「金額」などのキーワードを含む行を優先的に検索
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes("合計") && i < lines.length - 1) {
-      const match = lines[i + 1].match(/[¥￥]?(\d{1,3}(,\d{3})*)/);
-      if (match) return parseInt(match[1].replace(/,/g, ""), 10);
+    if (/合計|総額|金額|支払金額|請求金額/.test(lines[i])) {
+      // 同じ行または次の行から金額を抽出
+      const currentLineMatch = lines[i].match(/[¥￥]?(\d{1,3}(,\d{3})*)/);
+      if (currentLineMatch)
+        return parseInt(currentLineMatch[1].replace(/,/g, ""), 10);
+
+      // 次の行を確認（次の行があれば）
+      if (i < lines.length - 1) {
+        const nextLineMatch = lines[i + 1].match(/[¥￥]?(\d{1,3}(,\d{3})*)/);
+        if (nextLineMatch)
+          return parseInt(nextLineMatch[1].replace(/,/g, ""), 10);
+      }
     }
   }
-  // fallback: テキスト中の最大金額を使用
+
+  // キーワードが見つからない場合、テキスト中の最大金額を使用
   const allMatches = [...text.matchAll(/[¥￥]?(\d{1,3}(,\d{3})*)/g)];
   const numbers = allMatches.map((m) => parseInt(m[1].replace(/,/g, ""), 10));
   return numbers.length > 0 ? Math.max(...numbers) : undefined;
+}
+
+// T番号（取引番号）を抽出する関数を追加
+function extractTNumber(text: string): string {
+  // T番号のパターンを検出 (例: T12345, T-12345, No.T12345など)
+  const tNumberPatterns = [
+    /[Tt][-\s]?(\d{4,})/, // T1234, T-1234
+    /No\.\s*[Tt][-\s]?(\d{4,})/, // No.T1234
+    /取引番号[：:\s]+([Tt][-\s]?\d{4,}|\d{4,})/, // 取引番号:T1234 または 取引番号:1234
+    /伝票番号[：:\s]+([Tt][-\s]?\d{4,}|\d{4,})/, // 伝票番号:T1234 または 伝票番号:1234
+  ];
+
+  for (const pattern of tNumberPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1].replace(/\s/g, ""); // スペースを除去
+    }
+  }
+
+  return "";
 }
 
 // 金額付きのすべての行を明細として抽出
