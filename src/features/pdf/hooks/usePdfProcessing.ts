@@ -3,6 +3,7 @@ import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { v4 as uuidv4 } from "uuid";
 import { ReceiptItem } from "../../../types/receipt";
+import { useThumbnails } from "../../thumbnails/hooks/useThumbnails";
 
 // PDFワーカーの設定
 if (typeof window !== "undefined") {
@@ -12,6 +13,10 @@ if (typeof window !== "undefined") {
 export function usePdfProcessing() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // サムネイルフックを利用
+  const { generateThumbnail: generateImageThumbnail, cacheThumbnail } =
+    useThumbnails();
 
   // PDFページを画像に変換する
   const pdfPageToImage = async (
@@ -282,42 +287,13 @@ export function usePdfProcessing() {
       let thumbnailDataUrl: string | undefined = undefined;
       if (mergedImageUrls.length > 0) {
         try {
-          // 最初のページから小さなサムネイルを生成
-          const img = new Image();
-          img.src = mergedImageUrls[0];
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => {
-              console.error("サムネイル用画像の読み込みに失敗しました");
-              resolve();
-            };
+          // 最初のページからサムネイルを生成
+          thumbnailDataUrl = await generateImageThumbnail(mergedImageUrls[0], {
+            maxWidth: 400,
+            maxHeight: 400,
+            quality: 0.85,
           });
-
-          // キャンバスにサムネイルを描画
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            // 適切なサイズにリサイズ（最大400px、アスペクト比は維持）
-            const maxSize = 400;
-            const scale = Math.min(maxSize / img.width, maxSize / img.height);
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
-
-            // 背景を白で塗りつぶす（透明画像対応）
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // 高品質描画の設定
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-
-            // 画像描画
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            // Base64として保存（高品質設定）
-            thumbnailDataUrl = canvas.toDataURL("image/jpeg", 0.85);
-            console.log("Generated high-quality thumbnail for merged document");
-          }
+          console.log("Generated high-quality thumbnail for merged document");
         } catch (err) {
           console.error("Failed to generate thumbnail from merged PDFs:", err);
         }
@@ -337,40 +313,20 @@ export function usePdfProcessing() {
   // PDFからサムネイルを生成する関数（Blob形式で返す）
   const generateThumbnail = async (
     pdfData: Uint8Array,
-    maxWidth = 400, // 200から400に増加
-    maxHeight = 400 // 200から400に増加
+    maxWidth = 400,
+    maxHeight = 400
   ): Promise<Blob> => {
     try {
       // PDFの最初のページを高解像度でレンダリング
       const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(1); // 最初のページのみ使用
 
-      // 元のページビューポートを取得
-      const viewport = page.getViewport({ scale: 1.5 }); // スケールを1.0→1.5に上げて高解像度に
-
-      // アスペクト比を計算
-      const aspectRatio = viewport.width / viewport.height;
-
-      // サムネイルの幅と高さを決定（アスペクト比を維持）
-      let width, height;
-      if (aspectRatio > 1) {
-        // 横長の場合
-        width = Math.min(maxWidth, viewport.width);
-        height = width / aspectRatio;
-      } else {
-        // 縦長の場合
-        height = Math.min(maxHeight, viewport.height);
-        width = height * aspectRatio;
-      }
-
-      // アスペクト比を維持したスケールを計算
-      const scale = width / viewport.width;
-      const scaledViewport = page.getViewport({ scale });
+      const viewport = page.getViewport({ scale: 1.5 }); // 高解像度
 
       // キャンバスにレンダリング
       const canvas = document.createElement("canvas");
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
       const context = canvas.getContext("2d");
 
       if (!context) {
@@ -381,23 +337,26 @@ export function usePdfProcessing() {
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 高品質レンダリングを設定
+      // 高品質レンダリングの設定
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
 
-      await page.render({ canvasContext: context, viewport: scaledViewport })
-        .promise;
+      await page.render({
+        canvasContext: context,
+        viewport,
+      }).promise;
 
-      // JPEG形式でBlobとして返す - 品質を0.5→0.85に上げる
-      return new Promise<Blob>((resolve) => {
-        canvas.toBlob(
-          (blob) => {
-            resolve(blob || new Blob([]));
-          },
-          "image/jpeg",
-          0.85 // 品質を大幅に上げる
-        );
+      // データURLを生成し、サムネイルサービスでリサイズ
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      const thumbnailDataUrl = await generateImageThumbnail(dataUrl, {
+        maxWidth,
+        maxHeight,
+        quality: 0.85,
       });
+
+      // BlobとしてDataURLを変換して返す
+      const response = await fetch(thumbnailDataUrl);
+      return await response.blob();
     } catch (err) {
       console.error("Error generating thumbnail:", err);
       setError("サムネイル生成に失敗しました");
@@ -481,10 +440,8 @@ export function usePdfProcessing() {
 
               // キャッシュに保存（後でアップロード時に使用）
               const receiptId = uuidv4();
-              sessionStorage.setItem(
-                `thumbnail_${receiptId}`,
-                await blobToBase64(thumbnailBlob)
-              );
+              const thumbnailDataUrl = await blobToBase64(thumbnailBlob);
+              cacheThumbnail(receiptId, thumbnailDataUrl);
 
               results.push({
                 id: receiptId,
@@ -522,10 +479,8 @@ export function usePdfProcessing() {
 
                 // キャッシュに保存
                 const receiptId = uuidv4();
-                sessionStorage.setItem(
-                  `thumbnail_${receiptId}`,
-                  await blobToBase64(thumbnailBlob)
-                );
+                const thumbnailDataUrl = await blobToBase64(thumbnailBlob);
+                cacheThumbnail(receiptId, thumbnailDataUrl);
 
                 results.push({
                   id: receiptId,
@@ -553,49 +508,22 @@ export function usePdfProcessing() {
             console.log(`Processing image: ${file.name}`);
             const { imageUrl, pdfUrl } = await convertImageToPdf(file);
 
-            // 画像ファイルの場合は、そのまま縮小してサムネイルとして使用
-            const img = new Image();
-            img.src = imageUrl;
-            await new Promise<void>((resolve) => {
-              img.onload = () => resolve();
+            // サムネイルを生成
+            const thumbnailDataUrl = await generateImageThumbnail(imageUrl, {
+              maxWidth: 400,
+              maxHeight: 400,
+              quality: 0.85,
             });
 
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-
-            // 適切なサイズにリサイズ
-            const maxSize = 400;
-            const scale = Math.min(maxSize / img.width, maxSize / img.height);
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
-
-            // 高品質描画の設定
-            if (ctx) {
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = "high";
-
-              // 背景を白で塗りつぶす（透明画像対応）
-              ctx.fillStyle = "#ffffff";
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            }
-            const thumbnailBlob = await new Promise<Blob>((resolve) => {
-              canvas.toBlob(
-                (blob) => resolve(blob || new Blob([])),
-                "image/jpeg",
-                0.85
-              );
-            });
-
+            // サムネイルBlobを生成
+            const thumbnailBlob = await fetch(thumbnailDataUrl).then((res) =>
+              res.blob()
+            );
             const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
 
             // キャッシュに保存
             const receiptId = uuidv4();
-            sessionStorage.setItem(
-              `thumbnail_${receiptId}`,
-              await blobToBase64(thumbnailBlob)
-            );
+            cacheThumbnail(receiptId, thumbnailDataUrl);
 
             results.push({
               id: receiptId,
