@@ -22,6 +22,7 @@ export interface OCROptions {
   language?: string; // 言語ヒント（例: "ja"）
   documentType?: string; // ドキュメントタイプ
   useGpt?: boolean; // GPT利用フラグ（デフォルトtrue）
+  gptModel?: string; // 使用するGPTモデル名
 }
 
 // Vision APIレスポンス型定義
@@ -50,7 +51,10 @@ interface VisionApiResponse {
   }>;
 }
 
-// OCR設定をローカルストレージから取得
+/**
+ * OCR設定をローカルストレージから取得
+ * @returns OCR設定オブジェクト
+ */
 const getOcrSettings = (): {
   apiKey: string;
   defaultLanguage: string;
@@ -65,7 +69,11 @@ const getOcrSettings = (): {
   return { apiKey: "", defaultLanguage: "ja", autoApplyResults: true };
 };
 
-// 画像URLまたはBlobからBase64エンコードへ変換
+/**
+ * 画像URLまたはBlobからBase64エンコードへ変換
+ * @param imageUrl 画像URL
+ * @returns Base64エンコードされた画像データ
+ */
 async function imageUrlToBase64(imageUrl: string): Promise<string> {
   try {
     if (imageUrl.startsWith("data:")) return imageUrl;
@@ -83,7 +91,11 @@ async function imageUrlToBase64(imageUrl: string): Promise<string> {
   }
 }
 
-// 単語ごとの信頼度を平均して全体信頼度を算出
+/**
+ * 単語ごとの信頼度を平均して全体信頼度を算出
+ * @param response Google Vision APIからのレスポンス
+ * @returns 信頼度の平均値（0.0〜1.0）
+ */
 function calculateConfidence(
   response: VisionApiResponse["responses"][0]
 ): number {
@@ -108,11 +120,16 @@ function calculateConfidence(
       confidences.reduce((a, b) => a + b, 0) / (confidences.length || 1);
     return avg;
   } catch {
-    return 0.7;
+    return 0.7; // エラー時のデフォルト信頼度
   }
 }
 
-// メイン関数：Google Cloud Vision API + GPT-4o miniで画像から文字を抽出・構造化
+/**
+ * メイン関数：Google Cloud Vision API + GPTモデルで画像から文字を抽出・構造化
+ * @param imageUrl 処理する画像のURL
+ * @param options OCR処理のオプション
+ * @returns OCR処理結果
+ */
 export async function processImageWithOCR(
   imageUrl: string,
   options: OCROptions = {}
@@ -159,11 +176,16 @@ export async function processImageWithOCR(
     const extractedText = data.responses?.[0]?.fullTextAnnotation?.text || "";
     const confidenceValue = calculateConfidence(data.responses[0]);
 
-    // ステップ2: GPT-4o miniを使って構造化情報を抽出
+    // ステップ2: GPTモデルを使って構造化情報を抽出
     if (useGpt) {
       try {
-        // OpenAI APIキーを設定から取得
+        // OpenAI APIキーとモデルを設定から取得
         const openAIApiKey = localStorage.getItem("openai_api_key") || "";
+        // ユーザーが選択したモデルを使用、オプションで上書き可能、なければローカルストレージから、それもなければデフォルト
+        const openAIModel =
+          options.gptModel ||
+          localStorage.getItem("openai_model") ||
+          "gpt-4o-mini";
 
         if (!openAIApiKey) {
           console.warn(
@@ -176,10 +198,16 @@ export async function processImageWithOCR(
           };
         }
 
-        // GPT-4o miniを使って構造化情報を抽出
-        const gptResult = await extractDataWithGPT(extractedText, openAIApiKey);
+        console.log(`OCR結果の構造化に ${openAIModel} を使用します`);
 
-        // 完全にGPTの結果に基づくOCR結果を返す
+        // 選択されたGPTモデルを使って構造化情報を抽出
+        const gptResult = await extractDataWithGPT(
+          extractedText,
+          openAIApiKey,
+          openAIModel
+        );
+
+        // GPTの結果に基づくOCR結果を返す
         return {
           text: extractedText,
           vendor: gptResult.vendor,

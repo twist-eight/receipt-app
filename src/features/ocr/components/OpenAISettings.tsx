@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { useToast } from "../../../shared/contexts/ToastContext";
 
+// OpenAI設定のインターフェース
 export interface OpenAIConfigSettings {
   apiKey: string;
   model: string;
 }
 
+// コンポーネントのプロパティ
 interface OpenAISettingsProps {
   onSave: (settings: OpenAIConfigSettings) => void;
   initialSettings?: OpenAIConfigSettings;
@@ -17,10 +19,11 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
   initialSettings,
 }) => {
   const { addToast } = useToast();
+  // 状態の初期化
   const [settings, setSettings] = useState<OpenAIConfigSettings>(
     initialSettings || {
       apiKey: "",
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // デフォルトモデル
     }
   );
   const [showApiKey, setShowApiKey] = useState(false);
@@ -30,8 +33,9 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
     message: string;
   } | null>(null);
 
+  // コンポーネントマウント時の処理
   useEffect(() => {
-    // ローカルストレージからAPIキーを取得
+    // ローカルストレージからAPIキーとモデルを取得
     const savedApiKey = localStorage.getItem("openai_api_key");
     const savedModel = localStorage.getItem("openai_model");
 
@@ -45,6 +49,7 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
     }
   }, [initialSettings]);
 
+  // 入力変更ハンドラー
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -55,6 +60,7 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
     }));
   };
 
+  // 接続テスト
   const handleTestConnection = async () => {
     if (!settings.apiKey) {
       setTestResult({
@@ -103,6 +109,7 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
     }
   };
 
+  // 設定保存
   const handleSaveSettings = () => {
     try {
       // ローカルストレージに保存
@@ -164,6 +171,7 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({
             className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="gpt-4o-mini">GPT-4o Mini（推奨）</option>
+            <option value="gpt-4.1-nano">GPT-4.1 Nano（軽量・高速）</option>
             <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
             <option value="gpt-4o">GPT-4o（高精度・高コスト）</option>
           </select>

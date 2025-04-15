@@ -1,10 +1,9 @@
 // src/features/ocr/services/gptExtractor.ts
 
-// OCRResultのインポートを削除し、独自の型定義を使用する
-
 // API設定
-const GPT4_MINI_API_URL = "https://api.openai.com/v1/chat/completions"; // APIエンドポイントURLを適宜調整
+const GPT_API_URL = "https://api.openai.com/v1/chat/completions"; // APIエンドポイントURL
 
+// GPTレスポンスの型定義
 interface GPTResponse {
   id: string;
   object: string;
@@ -21,6 +20,7 @@ interface GPTResponse {
   }[];
 }
 
+// 抽出データの型定義
 interface ExtractedData {
   vendor?: string;
   date?: string;
@@ -35,14 +35,16 @@ interface ExtractedData {
 }
 
 /**
- * OCRで抽出されたテキストからGPT-4o miniを使用して構造化データを抽出する
+ * OCRで抽出されたテキストからGPTモデルを使用して構造化データを抽出する
  * @param text OCRで抽出されたテキスト
  * @param apiKey OpenAIのAPIキー
+ * @param model 使用するモデル名（デフォルトはgpt-4o-mini）
  * @returns 構造化されたデータ
  */
 export async function extractDataWithGPT(
   text: string,
-  apiKey: string
+  apiKey: string,
+  model: string = "gpt-4o-mini"
 ): Promise<ExtractedData> {
   try {
     if (!text.trim()) {
@@ -54,7 +56,7 @@ export async function extractDataWithGPT(
     }
 
     const prompt = createPrompt(text);
-    const response = await callGPT4Mini(prompt, apiKey);
+    const response = await callGPTModel(prompt, apiKey, model);
 
     if (
       !response ||
@@ -75,21 +77,26 @@ export async function extractDataWithGPT(
 }
 
 /**
- * GPT-4o miniにプロンプトを送信する
+ * GPTモデルにプロンプトを送信する
+ * @param prompt 送信するプロンプト
+ * @param apiKey OpenAI APIキー
+ * @param model 使用するモデル名（gpt-4o-mini, gpt-4.1-nanoなど）
+ * @returns APIレスポンス
  */
-async function callGPT4Mini(
+async function callGPTModel(
   prompt: string,
-  apiKey: string
+  apiKey: string,
+  model: string = "gpt-4o-mini"
 ): Promise<GPTResponse> {
   try {
-    const response = await fetch(GPT4_MINI_API_URL, {
+    const response = await fetch(GPT_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: model, // 指定されたモデルを使用
         messages: [
           {
             role: "system",
@@ -118,7 +125,9 @@ async function callGPT4Mini(
 }
 
 /**
- * GPT-4o miniへのプロンプトを作成する
+ * GPTモデルへのプロンプトを作成する
+ * @param text OCRで抽出されたテキスト
+ * @returns 生成されたプロンプト
  */
 function createPrompt(text: string): string {
   return `
@@ -194,7 +203,9 @@ ${text}
 }
 
 /**
- * GPT-4o miniからの応答をパースする
+ * GPTモデルからの応答をパースする
+ * @param content GPTからのレスポンス文字列
+ * @returns 構造化されたデータ
  */
 function parseResponse(content: string): ExtractedData {
   try {
